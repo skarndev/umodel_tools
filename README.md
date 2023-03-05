@@ -13,15 +13,15 @@ A packed addon distribution can be installed like a regular [Blender addon](http
 - Blender 2.8+ version of the [PSK import plugin](https://github.com/Befzz/blender3d_import_psk_psa). It must be installed and enabled in your Blender, in order for umodel_tools to work correctly.
 
 # Usage
-After enabling umodel_tools, enter path to UEViewer export directory in your scene properties tab. You also need to specify an arbitrary asset library directory which can be any directory you want umodel_tools to save converted meshes, materials and textures to.
+After enabling umodel_tools, enter path to UEViewer export directory in your scene properties tab. You also need to specify an arbitrary asset library directory which can be any directory you want umodel_tools to save converted meshes, materials and textures into.
 
-The addon features to operators, located in the Object dropdown menu: 
+The addon features two operators, located in the Object dropdown menu: 
 - Recover Unreal assest
   
   1. Find an asset in UEViewer.
   2. Export the asset by right-clicking on it, and choosing ``Export`` in the context menu. Make sure your UEViewer is configured to output .pskx files, and not .gltf.
-  3. Right-click the asset in UEViewer and select the ``Copy package path`` option. This will copy the path of the asset into your clip board.
-  4. In Blender open the ``Object`` dropdown menu, select ``Recover Unreal asset``. In the pop-up Window specify the texture settings, and whether you want PBR materials or not. If PBR option is selected, the importer will attempt to reconstruct Unreal materials using normal maps, SRO (specular/roughness/ambient occlusion) or MROH (metallic/roughness/ambient occlusion/height) maps. Otherwise, only the Diffuse map will be used.
+  3. Right-click the asset in UEViewer and select the ``Copy package path`` option. This will copy the path of the asset into your clipboard.
+  4. In Blender, open the ``Object`` dropdown menu, select ``Recover Unreal asset``. In the pop-up Window specify the texture settings, and whether you want PBR materials or not. If the PBR option is selected, the importer will attempt to reconstruct Unreal materials using normal maps, SRO (specular/roughness/ambient occlusion) or MROH (metallic/roughness/ambient occlusion/height) maps. Otherwise, only the Diffuse map will be used.
   5. 
       - If nothing was selected, the addon will import the mesh to a 3D cursor position. 
       - If any objects were selected, it will try to replace them with copies of the imported mesh. The latter feature is useful for recovering placement information of objects on the scene produced by 3D ripper tools (such as [NinjaRipper](https://ninjaripper.com)). It can only work if the number of vertices of the original asset matches the number of vertices of the ripped mesh, otherwise a borked result is to be expected.
