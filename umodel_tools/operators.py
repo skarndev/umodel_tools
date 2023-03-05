@@ -352,6 +352,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         :param asset_path: Path to the asset in game format.
         :param umodel_export_dir: UModel output directory to source .psk files from.
         :raises OSError: Raised when an asset was not found in the UModel output dir or the failed opening.
+        :raises FileNotFounderror: Raised when an asset was not found in the directory.
         """
 
         db = asset_db.AssetDB(asset_library_dir)
@@ -373,11 +374,25 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         psk_ctx.collection = temp_scene.collection
         psk_ctx.view_layer = temp_scene.view_layers[0]
 
-        if not pskimport(filepath=asset_psk_path_noext + '.pskx',
-                            context=psk_ctx,
-                            bImportbone=False):
+        if os.path.isfile(pskx_path:= asset_psk_path_noext + '.pskx'):
+            if not pskimport(filepath=pskx_path,
+                                context=psk_ctx,
+                                bImportbone=False):
+                bpy.data.scenes.remove(temp_scene, do_unlink=True)
+                raise RuntimeError(f"Failed importing asset f{asset_psk_path_noext + '.pskx'} due to unknown reason.")
+
+            animated = False
+        elif os.path.isfile(psk_path:= asset_psk_path_noext + '.psk'):
+            if not pskimport(filepath=psk_path,
+                                context=psk_ctx,
+                                bImportbone=False):
+                bpy.data.scenes.remove(temp_scene, do_unlink=True)
+                raise RuntimeError(f"Failed importing asset f{asset_psk_path_noext + '.psk'} due to unknown reason.")
+            animated = True
+
+        else:
             bpy.data.scenes.remove(temp_scene, do_unlink=True)
-            raise RuntimeError(f"Failed importing assest f{asset_psk_path_noext + '.pskx'} due to unknown reason.")
+            raise FileNotFoundError(f"Failed importing asset f{asset_psk_path_noext} was not found (.psk/.pskx).")
 
         # we presume that if the object is succesfully imported, there is exactly one object in the scene collection
         obj = temp_scene.collection.objects[0]
@@ -393,8 +408,21 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
             mat_descriptors_paths = props_txt_parser.parse_props_txt(asset_psk_path_noext + '.props.txt', mode='MESH')
         except OSError:
             self._op_message('WARNING', f"Loading material descriptor {asset_psk_path_noext + '.props.txt'} failed. "
-                             "Materials will not be avaialble for the imported object.")
+                             "Materials might not be avaialble for the imported object.")
         else:
+            # attempt to obtain materials manually if descriptor is not available
+            if animated and not mat_descriptors_paths:
+                if os.path.isdir(mat_dir:= os.path.join(os.path.dirname(psk_path), 'Materials')):
+                    for root, _, files in os.walk(mat_dir):
+                        for file in files:
+                            if not file.endswith('.props.txt'):
+                                continue
+
+                            file_abs = os.path.join(root, file)
+                            mat_descriptors_paths.append(
+                                f"{os.path.relpath(file_abs, umodel_export_dir)}"
+                                f".{os.path.splitext(os.path.splitext(os.path.basename(file_abs))[0])[0]}")
+
             # replace materials
             old_materials = [mat for mat in obj.data.materials]
 

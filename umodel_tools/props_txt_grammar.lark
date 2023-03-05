@@ -1,15 +1,15 @@
 start: (definition)*
 
-definition: IDENTIFIER [ "[" INT_LITERAL "]" ] "=" (structured_block | path | value | const | const_list) [","]
-value: (IDENTIFIER | ANY_LITERAL)
+definition: IDENTIFIER [ "[" INT_LITERAL "]" ] "=" (structured_block | path | const | const_list | weird_list) [","]
 
 structured_block: "{" (definition)* "}"
 path: path_type path_value
 path_type: IDENTIFIER
 path_value: SINGLE_QUOTED_STRING
 
-const_list: "{" [ANY_LITERAL ("," ANY_LITERAL)*]"}"
-const: ANY_LITERAL | IDENTIFIER+ | call
+const_list: "{" [ANY_LITERAL ("," ANY_LITERAL)*] "}"
+weird_list: "{" (",")* "}"
+const: ANY_LITERAL | IDENTIFIER | call | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
 call.1: IDENTIFIER "(" ANY_LITERAL ")"
 
 // terminals
@@ -32,6 +32,7 @@ call.1: IDENTIFIER "(" ANY_LITERAL ")"
     // end int literal
 
     SINGLE_QUOTED_STRING.1: /'[^']*'/
+    DOUBLE_QUOTED_STRING.1: /"[^']*"/
 
 // end terminals
 
