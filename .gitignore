@@ -154,3 +154,4 @@ cython_debug/
 
 .idea/
 .vscode/
+/umodel_tools/third_party
