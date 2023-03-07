@@ -34,7 +34,7 @@ def parse_props_txt(props_txt_path: str,
         try:
             ast = lark_parser.parse(text)
         except lark.UnexpectedInput as e:
-            print(f"Failed parsing {props_txt_path}.")
+            print(f"ERROR: Failed parsing {props_txt_path}.")
             traceback.print_exc()
             raise OSError()
 

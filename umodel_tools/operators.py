@@ -571,7 +571,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         if context.selected_objects:
             for obj in context.selected_objects:
 
-                if len(asset_mesh.vertices) == len(obj.data.vertices):
+                if utils.compare_meshes(asset_mesh, obj.data):
                     vtx_source = np.array([v.co for v in asset_mesh.vertices])
                     vtx_target = np.array([obj.matrix_world @ v.co for v in obj.data.vertices])
                 else:
@@ -585,33 +585,23 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
                 A, _, _, _ = np.linalg.lstsq(X, Y, rcond=1)
 
-                transform = lambda x: unpad(pad(x) @ A)
-
                 obj.hide_set(True)
 
-                new_obj = bpy.data.objects.new(name=f"{obj.name}_Replaced", object_data=asset_mesh.copy())
-                transformed_verts = transform(np.array([v.co for v in asset_mesh.vertices]))
-
-                for i, vert in enumerate(new_obj.data.vertices):
-                    vert.co = transformed_verts[i]
+                new_obj = bpy.data.objects.new(name=f"{obj.name}_Replaced", object_data=asset_mesh)
+                new_obj.matrix_world = A
 
                 context.collection.objects.link(new_obj)
         # import the asset as a new object
         else:
             new_obj = bpy.data.objects.new(name=f"{asset.name}_Instance", object_data=asset_mesh)
-            new_obj.umodel_tools_asset = True
+            new_obj.umodel_tools_asset.enabled = True
+            new_obj.umodel_tools_asset.asset_path = self.asset_path
             new_obj.location = context.scene.cursor.location
             new_obj.scale = (5, 5, 5)
             context.collection.objects.link(new_obj)
             new_obj.select_set(True)
 
         return {'FINISHED'}
-
-
-def _copy_object(obj: bpy.types.Object) -> bpy.types.Object:
-    copied_obj = obj.copy()
-    copied_obj.data = obj.data.copy()
-    return copied_obj
 
 
 class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
@@ -641,8 +631,8 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
 
         bpy.ops.object.select_all(action='DESELECT')
 
-        asset_obj_copy = _copy_object(asset_obj)
-        target_obj_copy = _copy_object(target_obj)
+        asset_obj_copy = utils.copy_object(asset_obj)
+        target_obj_copy = utils.copy_object(target_obj)
 
         context.collection.objects.link(asset_obj_copy)
         context.collection.objects.link(target_obj_copy)
@@ -652,8 +642,12 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
 
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-        vtx_source = np.array(_get_object_aabb_verts(asset_obj_copy))
-        vtx_target = np.array(_get_object_aabb_verts(target_obj_copy))
+        if utils.compare_meshes(asset_obj_copy.data, target_obj_copy.data):
+            vtx_source = np.array([v.co for v in asset_obj_copy.data.vertices])
+            vtx_target = np.array([obj.matrix_world @ v.co for v in target_obj_copy.data.vertices])
+        else:
+            vtx_source = np.array(_get_object_aabb_verts(asset_obj_copy))
+            vtx_target = np.array(_get_object_aabb_verts(target_obj_copy))
 
         pad = lambda x: np.hstack([x, np.ones((x.shape[0], 1))])
         unpad = lambda x: x[:,:-1]
