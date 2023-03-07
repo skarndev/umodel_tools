@@ -23,27 +23,45 @@ class TextureMapTypes(enum.Enum):
     Normal = enum.auto()
     SRO = enum.auto()
     MROH = enum.auto()
+    MRO = enum.auto()
 
 
 # translates names retrieved from .props.txt into sensible texture map types
 TEXTURE_PARAM_NAME_TRS = {
+    "Diffuse": TextureMapTypes.Diffuse,
+    "Normal": TextureMapTypes.Normal,
+    "SRO": TextureMapTypes.SRO,
+    "MRO": TextureMapTypes.MRO,
+    "MROH": TextureMapTypes.MROH,
+    "MROH/SROH": TextureMapTypes.MROH,
+    "MRO/SRO": TextureMapTypes.MRO,
+
     "Diffuse Map": TextureMapTypes.Diffuse,
     "Normal Map": TextureMapTypes.Normal,
     "MRO/SRO Map": TextureMapTypes.SRO,
     "SRO Map": TextureMapTypes.SRO,
     "MROH Map": TextureMapTypes.MROH,
     "MROH/SROH Map": TextureMapTypes.MROH,
+    "MRO/SRO Map": TextureMapTypes.MRO,
+    "MRO Map": TextureMapTypes.MRO,
+
     "Diffuse A": TextureMapTypes.Diffuse,
     "Normal A": TextureMapTypes.Normal,
     "SRO A": TextureMapTypes.SRO,
     "MRO/SRO A": TextureMapTypes.SRO,
     "MROH A": TextureMapTypes.MROH,
     "MROH/SROH A": TextureMapTypes.MROH,
+    "MRO/SRO A": TextureMapTypes.MRO,
+    "MRO A": TextureMapTypes.MROH,
+
+    "Diffuse Map A": TextureMapTypes.Diffuse,
     "Normal Map A": TextureMapTypes.Normal,
     "SRO Map A": TextureMapTypes.SRO,
     "MRO/SRO Map A": TextureMapTypes.SRO,
     "MROH Map A": TextureMapTypes.MROH,
-    "MROH/SROH Map A": TextureMapTypes.MROH
+    "MROH/SROH Map A": TextureMapTypes.MROH,
+    "MRO/SRO Map A": TextureMapTypes.MRO,
+    "MRO Map A": TextureMapTypes.MROH
 }
 
 def _get_object_aabb_verts(obj: bpy.types.Object) -> list[tuple[float, float, float]]:
@@ -327,12 +345,18 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                                                     out.inputs['Displacement'])
                         new_mat.node_tree.links.new(img_node.outputs['Alpha'],
                                                     displacement_node.inputs['Height'])
+                    case TextureMapTypes.MRO:
+                        mro_split = new_mat.node_tree.nodes.new('ShaderNodeSeparateColor')
+                        new_mat.node_tree.links.new(mro_split.outputs['Red'], bsdf.inputs['Metallic'])
+                        new_mat.node_tree.links.new(mro_split.outputs['Green'], bsdf.inputs['Roughness'])
+                        new_mat.node_tree.links.new(mro_split.outputs['Blue'], ao_mix.inputs[7])
+                        new_mat.node_tree.links.new(img_node.outputs['Color'], mro_split.inputs['Color'])
 
             # just simply connect the diffuse map to the shader node, if we do not go the PBR route
             else:
                 new_mat.node_tree.links.new(img_node.outputs['Color'], bsdf.inputs['Color'])
 
-        new_mat.asset_generate_preview()
+        #new_mat.asset_generate_preview()
 
         material_lib_path = os.path.join(asset_library_dir, material_path_local_no_ext) + '.blend'
         os.makedirs(os.path.dirname(material_lib_path), exist_ok=True)
