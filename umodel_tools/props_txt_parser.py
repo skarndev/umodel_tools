@@ -13,7 +13,9 @@ def parse_props_txt(props_txt_path: str, mode: t.Literal['MESH']) -> list[str]:
     ...
 
 t.overload
-def parse_props_txt(props_txt_path: str, mode: t.Literal['MATERIAL']) -> dict[str, str]:
+def parse_props_txt(props_txt_path: str,
+                    mode: t.Literal['MATERIAL']
+                   ) -> tuple[dict[str, str], dict[str, str | float | bool]]:
     ...
 
 def parse_props_txt(props_txt_path: str,
@@ -65,31 +67,52 @@ def parse_props_txt(props_txt_path: str,
 
             case 'MATERIAL':
                 texture_infos = {}
+                base_prop_overrides = None
 
                 for child in ast.children:
                     assert child.data == 'definition'
                     def_name, array_qual, value = child.children
 
-                    if def_name != 'TextureParameterValues':
-                        continue
+                    match def_name:
+                        case 'TextureParameterValues':
+                            assert array_qual is not None
+                            assert value.data == 'structured_block'
 
-                    assert array_qual is not None
-                    assert value.data == 'structured_block'
+                            for tex_param_def in value.children:
+                                _, _, tex_param = tex_param_def.children
+                                param_info, param_val, _ = tex_param.children
+                                _, _, path_desc = param_val.children
+                                assert path_desc.data == 'path'
 
-                    for tex_param_def in value.children:
-                        _, _, tex_param = tex_param_def.children
-                        param_info, param_val, _ = tex_param.children
-                        _, _, path_desc = param_val.children
-                        assert path_desc.data == 'path'
+                                _, path_value = path_desc.children
 
-                        _, path_value = path_desc.children
+                                tex_path = path_value.children[0].value[1:][:-1]
+                                tex_type = param_info.children[2].children[0].children[2].children[0].value
 
-                        tex_path = path_value.children[0].value[1:][:-1]
-                        tex_type = param_info.children[2].children[0].children[2].children[0].value
+                                texture_infos[tex_type] = tex_path
+                        case 'BasePropertyOverrides':
+                            assert array_qual is None
+                            assert value.data == 'structured_block'
 
-                        texture_infos[tex_type] = tex_path
+                            base_prop_overrides = {}
 
-                return texture_infos
+                            for prop_override_entry in value.children:
+                                prop_name, _, prop_value = prop_override_entry.children
+                                prop_name = prop_name.value
+
+                                match prop_name:
+                                    case 'BlendMode':
+                                        prop_value = prop_value.children[0].children[0].value
+                                    case 'TwoSided':
+                                        prop_value = prop_value.children[0].value == 'true'
+                                    case 'OpacityMaskClipValue':
+                                        prop_value = float(prop_value.children[0].value)
+                                    case _:
+                                        continue
+
+                                base_prop_overrides[prop_name] = prop_value
+
+                return texture_infos, base_prop_overrides
 
             case _:
                 raise NotImplementedError()

@@ -26,6 +26,17 @@ class TextureMapTypes(enum.Enum):
     MRO = enum.auto()
 
 
+class SpecialBlendingMode(enum.Enum):
+    """List of special blenbing modes that require additional node generation.
+    """
+
+    #: Final color = Source color + Dest color.
+    Add = enum.auto()
+
+    #: Final color = Source color x Dest color.
+    Mod = enum.auto()
+
+
 # translates names retrieved from .props.txt into sensible texture map types
 TEXTURE_PARAM_NAME_TRS = {
     "Diffuse": TextureMapTypes.Diffuse,
@@ -90,36 +101,16 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         description="Path to an alleged asset within the game"
     )
 
-    validate_asset: bpy.props.EnumProperty(
-        name="Validate asset",
-        description="Type of validation performed on the requested asset to match selected objects",
-        items=_validate_asset_items,
-        options={'ENUM_FLAG'},
-        default=set()
-    )
-
-    instantiate: bpy.props.BoolProperty(
-        name="Instantiate",
-        description="Turn objects into asset instances instead of performing data transfer. Warning: does not work for "
-        "meshes that only have co-planar faces",
-        default=True,
-    )
-
-    transfer_uvs: bpy.props.BoolProperty(
-        name="Transfer UVs",
-        description="When instantiation is not used, transfer the UVs from the original asset to a scene instance",
-        default=True
-    )
-
-    transfer_materials: bpy.props.BoolProperty(
-        name="Transfer mateirals",
-        description="When instantiation is not used, transfer materials from the original asset to a scene instance",
-        default=True
-    )
-
     load_pbr_maps: bpy.props.BoolProperty(
         name="Load PBR textures",
-        description="Load normal maps, specular, roughness, etc into materials. Experimental.",
+        description="Load normal maps, specular, roughness, etc into materials. Experimental",
+        default=False
+    )
+
+    import_backface_culling: bpy.props.BoolProperty(
+        name="Use backface culling",
+        description="If this setting is checked, material settings for backface culling will be kept, "
+                    "otherwise backface culling is always off",
         default=False
     )
 
@@ -238,9 +229,9 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         material_path_local_no_ext = os.path.splitext(os.path.splitext(material_path_local)[0])[0]  # remove .props.txt
 
         # load texture infos, may throw OSError if file is not found.
-        texture_infos = props_txt_parser.parse_props_txt(os.path.join(umodel_export_dir,
-                                                                      material_path_local),
-                                                         mode='MATERIAL')
+        texture_infos, base_prop_overrides = props_txt_parser.parse_props_txt(os.path.join(umodel_export_dir,
+                                                                              material_path_local),
+                                                                              mode='MATERIAL')
 
         new_mat = bpy.data.materials.new(material_name)
         new_mat.asset_mark()
@@ -248,11 +239,44 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         new_mat.use_nodes = True
         new_mat.node_tree.links.clear()
         new_mat.node_tree.nodes.clear()
-        new_mat.blend_method = 'BLEND'
 
         out = new_mat.node_tree.nodes.new('ShaderNodeOutputMaterial')
 
         if self.load_pbr_maps:
+            special_blend_mode = None
+
+            # set various material parameters
+            if base_prop_overrides is not None:
+
+                if (blend_mode := base_prop_overrides.get('BlendMode')) is not None:
+                    match blend_mode:
+                        case 'BLEND_Opaque':
+                            pass
+                        case 'BLEND_Additive':
+                            special_blend_mode = SpecialBlendingMode.Add
+                            new_mat.blend_method = 'BLEND'
+                        case 'BLEND_Translucent':
+                            new_mat.blend_method = 'BLEND'
+                        case 'BLEND_Modulate':
+                            special_blend_mode = SpecialBlendingMode.Mod
+                            new_mat.blend_method = 'BLEND'
+                        case 'BLEND_Masked':
+                            new_mat.blend_method = 'CLIP'
+                        case _:
+                            self._op_message('WARNING', f"Unknown blending mode \'{blend_mode}\' found on importing "
+                                                        f"material \"{material_name}\".")
+
+                if self.import_backface_culling and (two_sided := base_prop_overrides.get('TwoSided')) is not None:
+                    new_mat.use_backface_culling = False if two_sided else True
+
+                if (alpha_threshold := base_prop_overrides.get('OpacityMaskClipValue')) is not None:
+                    new_mat.alpha_threshold = alpha_threshold
+
+            elif self.import_backface_culling:
+                new_mat.use_backface_culling = True
+
+            # create basic shader nodes and set their default values
+
             bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
             # set defaults
             bsdf.inputs[4].default_value = 1.01  # Subsurface IOR
@@ -261,8 +285,6 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
             bsdf.inputs[13].default_value = 0.0  # Sheen Tint
             bsdf.inputs[15].default_value = 0.0  # Clearcoat roughness
 
-            new_mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
-
             ao_mix = new_mat.node_tree.nodes.new('ShaderNodeMix')
             ao_mix.data_type = 'RGBA'
             ao_mix.blend_type = 'MULTIPLY'
@@ -270,6 +292,24 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
             ao_mix.inputs[7].default_value = (1, 1, 1, 1)
             new_mat.node_tree.links.new(ao_mix.outputs[2], bsdf.inputs['Base Color'])
 
+            # in order to simulate some blending modes special node logic is required
+            match special_blend_mode:
+                case None:
+                    new_mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+                case SpecialBlendingMode.Add:
+                    transparent_bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfTransparent')
+                    add_shader = new_mat.node_tree.nodes.new('ShaderNodeAddShader')
+
+                    new_mat.node_tree.links.new(bsdf.outputs['BSDF'], add_shader.inputs[0])
+                    new_mat.node_tree.links.new(transparent_bsdf.outputs['BSDF'], add_shader.inputs[1])
+                    new_mat.node_tree.links.new(add_shader.outputs[0], out.inputs['Surface'])
+
+                case SpecialBlendingMode.Mod:
+                    shader_to_rgb = new_mat.node_tree.nodes.new('ShaderNodeShaderToRGB')
+                    transparent_bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfTransparent')
+                    new_mat.node_tree.links.new(bsdf.outputs['BSDF'], shader_to_rgb.inputs[0])
+                    new_mat.node_tree.links.new(shader_to_rgb.outputs['Color'], transparent_bsdf.inputs['Color'])
+                    new_mat.node_tree.links.new(transparent_bsdf.outputs['BSDF'], out.inputs['Surface'])
         else:
             bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfDiffuse')
             new_mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
@@ -579,7 +619,6 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                     vtx_target = np.array(_get_object_aabb_verts(obj))
 
                 pad = lambda x: np.hstack([x, np.ones((x.shape[0], 1))])
-                unpad = lambda x: x[:,:-1]
                 X = pad(vtx_source)
                 Y = pad(vtx_target)
 
@@ -644,12 +683,8 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
 
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-        if utils.compare_meshes(asset_obj_copy.data, target_obj_copy.data):
-            vtx_source = np.array([v.co for v in asset_obj_copy.data.vertices])
-            vtx_target = np.array([obj.matrix_world @ v.co for v in target_obj_copy.data.vertices])
-        else:
-            vtx_source = np.array(_get_object_aabb_verts(asset_obj_copy))
-            vtx_target = np.array(_get_object_aabb_verts(target_obj_copy))
+        vtx_source = np.array(_get_object_aabb_verts(asset_obj_copy))
+        vtx_target = np.array(_get_object_aabb_verts(target_obj_copy))
 
         pad = lambda x: np.hstack([x, np.ones((x.shape[0], 1))])
         unpad = lambda x: x[:,:-1]
