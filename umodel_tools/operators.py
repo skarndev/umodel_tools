@@ -632,6 +632,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                 new_obj.umodel_tools_asset.asset_path = self.asset_path
 
                 context.collection.objects.link(new_obj)
+
         # import the asset as a new object
         else:
             new_obj = bpy.data.objects.new(name=f"{asset.name}_Instance", object_data=asset_mesh)
@@ -659,7 +660,7 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
 
         asset_idx = None
         for i, obj in enumerate(context.selected_objects):
-            if obj.umodel_tools_asset:
+            if obj.umodel_tools_asset.enabled:
                 asset_idx = i
                 break
 
