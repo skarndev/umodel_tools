@@ -253,6 +253,13 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
         if self.load_pbr_maps:
             bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
+            # set defaults
+            bsdf.inputs[4].default_value = 1.01  # Subsurface IOR
+            bsdf.inputs[7].default_value = 0.0  # Specular
+            bsdf.inputs[9].default_value = 0.0  # Roughness
+            bsdf.inputs[13].default_value = 0.0  # Sheen Tint
+            bsdf.inputs[15].default_value = 0.0  # Clearcoat roughness
+
             new_mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
 
             ao_mix = new_mat.node_tree.nodes.new('ShaderNodeMix')
