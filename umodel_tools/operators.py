@@ -442,6 +442,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                              "Materials might not be avaialble for the imported object.")
         else:
             # attempt to obtain materials manually if descriptor is not available
+            mat_desc_order_map = {mat.name : None for mat in obj.data.materials}
+
             if animated and not mat_descriptors_paths:
                 if os.path.isdir(mat_dir:= os.path.join(os.path.dirname(psk_path), 'Materials')):
                     for root, _, files in os.walk(mat_dir):
@@ -449,19 +451,24 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                             if not file.endswith('.props.txt'):
                                 continue
 
-                            file_abs = os.path.join(root, file)
-                            mat_descriptors_paths.append(
-                                f"{os.path.relpath(file_abs, umodel_export_dir)}"
-                                f".{os.path.splitext(os.path.splitext(os.path.basename(file_abs))[0])[0]}")
+                            file_abs = os.path.splitext(os.path.splitext(os.path.join(root, file))[0])[0]
+                            mat_name = os.path.basename(file_abs)
+
+                            if mat_name not in mat_desc_order_map:
+                                self._op_message('WARNING', f"Found extra material {mat_name} in the Materials dir. "
+                                                 "It won't be imported.")
+                                continue
+
+                            mat_desc_order_map[mat_name] = f"{os.path.relpath(file_abs, umodel_export_dir)}.{mat_name}"
+
+                    if any(mat_desc is None for mat_desc in mat_desc_order_map.values()):
+                        self._op_message('ERROR', "Material count mistmatch.")
+                        raise FileNotFoundError()
+
+                    mat_descriptors_paths = list(mat_desc_order_map.values())
 
             # replace materials
             old_materials = [mat for mat in obj.data.materials]
-
-            obj.data.materials.clear()
-
-            # remove original materials
-            for mat in old_materials:
-                bpy.data.materials.remove(mat, do_unlink=True)
 
             new_materials = []
 
@@ -503,8 +510,12 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
                 new_materials.append(new_mat)
 
-            for mat in new_materials:
-                obj.data.materials.append(mat)
+            for i, mat in enumerate(new_materials):
+                obj.data.materials[i] = mat
+
+            # remove original materials
+            for mat in old_materials:
+                bpy.data.materials.remove(mat, do_unlink=True)
 
         #obj.asset_generate_preview()
 
