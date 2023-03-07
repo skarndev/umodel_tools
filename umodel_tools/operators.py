@@ -589,6 +589,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
                 new_obj = bpy.data.objects.new(name=f"{obj.name}_Replaced", object_data=asset_mesh)
                 new_obj.matrix_world = A
+                new_obj.umodel_tools_asset.enabled = True
+                new_obj.umodel_tools_asset.asset_path = self.asset_path
 
                 context.collection.objects.link(new_obj)
         # import the asset as a new object
