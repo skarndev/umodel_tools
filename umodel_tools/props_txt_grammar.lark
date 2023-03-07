@@ -13,7 +13,7 @@ const: ANY_LITERAL | IDENTIFIER | call | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_ST
 call.1: IDENTIFIER "(" ANY_LITERAL ")"
 
 // terminals
-    IDENTIFIER: /\b[a-zA-Z_ \/][a-zA-Z0-9_ \/]*\b/
+    IDENTIFIER: /\b[a-zA-Z_ \/-][a-zA-Z0-9_ \/-]*\b/
 
     ANY_LITERAL: NUMERIC_LITERAL | BOOL_LITERAL
     NUMERIC_LITERAL: ["+"|"-"] (INT_LITERAL | DOUBLE_LITERAL)
