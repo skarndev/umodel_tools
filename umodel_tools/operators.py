@@ -248,6 +248,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         new_mat.use_nodes = True
         new_mat.node_tree.links.clear()
         new_mat.node_tree.nodes.clear()
+        new_mat.blend_method = 'BLEND'
 
         out = new_mat.node_tree.nodes.new('ShaderNodeOutputMaterial')
 
@@ -391,7 +392,6 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         catalog_uid = db.uid_for_entry(asset_local_dir) if asset_local_dir else None
         asset_absolute_dir = os.path.join(asset_library_dir, asset_local_dir)
         asset_path_local_noext = os.path.splitext(asset_path)[0]
-        asset_path_abs_noext = os.path.join(asset_library_dir, asset_path_local_noext)
 
         os.makedirs(asset_absolute_dir, exist_ok=True)
 
