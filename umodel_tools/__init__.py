@@ -28,7 +28,7 @@ vendor_dir = os.path.join(parent_dir, 'third_party')
 
 sys.path.append(vendor_dir)
 
-from . import auto_load
+from . import auto_load  # nopep8
 
 bl_info = {
     "name": "UModel Tools",
@@ -41,6 +41,7 @@ bl_info = {
 
 PACKAGE_NAME = __package__
 
+
 def register():
     auto_load.init()
 
@@ -49,11 +50,13 @@ def register():
     except Exception:
         traceback.print_exc()
 
+
 def unregister():
     try:
         auto_load.unregister()
     except Exception:
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     register()
