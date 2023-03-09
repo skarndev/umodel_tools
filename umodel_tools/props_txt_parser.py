@@ -19,7 +19,7 @@ def parse_props_txt(props_txt_path: str,
     ...
 
 def parse_props_txt(props_txt_path: str,
-                     mode: t.Literal['MESH'] | t.Literal['MATERIAL']
+                    mode: t.Literal['MESH'] | t.Literal['MATERIAL']
                     ) -> list[str] | list[tuple[str, str]]:
     """Parses props.txt file (UModel output) and returns either a list of material paths, or a list of texture paths
     depending on the mode. Note, the mode should be used appropriately depending on the origin of the file.

@@ -37,7 +37,7 @@ class SpecialBlendingMode(enum.Enum):
     Mod = enum.auto()
 
 
-# translates names retrieved from .props.txt into sensible texture map types
+#: Translates names retrieved from .props.txt into sensible texture map types
 TEXTURE_PARAM_NAME_TRS = {
     "Diffuse": TextureMapTypes.Diffuse,
     "Normal": TextureMapTypes.Normal,
@@ -83,18 +83,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
     bl_idname = "umodel_tools.recover_unreal_asset"
     bl_label = "Recover Unreal Asset"
     bl_description = "Replaces selected object with an Unreal Engine asset from UModel dir, or attempts " \
-                     "to transfer data to it, such as UV maps and materials."
+                     "to transfer data to it, such as UV maps and materials"
     bl_options = {'REGISTER', 'UNDO'}
-
-    _validate_asset_items = [
-            ('GEOMETRY', 'Geometry', "Validate geometry (number of vertices, edges, faces).", 0x1),
-            ('MATERIALS', 'Materials', "Validate number of materials.", 0x2)
-    ]
-
-    _validate_asset_items_map = {
-        'GEOMETRY' : 0x1,
-        'MATERIALS': 0x2
-    }
 
     asset_path: bpy.props.StringProperty(
         name="Asset path",
@@ -124,16 +114,6 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         ],
         default='.png'
     )
-
-    def _get_validate_asset_value(self) -> int:
-        value_set = self.validate_asset
-
-        ret = 0
-
-        for value in value_set:
-            ret |= self._validate_asset_items_map[value]
-
-        return ret
 
     def _op_message(self, type: t.Literal['INFO'] | t.Literal['ERROR'] | t.Literal['WARNING'], msg: str):
         """Print operator message and return the associated status-code.
@@ -713,7 +693,7 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
         return {'FINISHED'}
 
 
-def menu_func(menu: bpy.types.Menu, context: bpy.types.Context) -> None:
+def menu_func(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
     menu.layout.operator(UMODELTOOLS_OT_recover_unreal_asset.bl_idname)
     menu.layout.operator(UMODELTOOLS_OT_realign_asset.bl_idname)
 
