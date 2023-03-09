@@ -405,6 +405,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         :param umodel_export_dir: UModel output directory to source .psk files from.
         :raises OSError: Raised when an asset was not found in the UModel output dir or the failed opening.
         :raises FileNotFounderror: Raised when an asset was not found in the directory.
+        :raises RuntimeError: Raised when an asset failed importing due to unknown .psk/.pskx importer issue.
         """
 
         db = asset_db.AssetDB(asset_library_dir)
