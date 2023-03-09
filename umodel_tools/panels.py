@@ -70,6 +70,7 @@ def bl_register():
     bpy.types.Scene.umodel_tools = bpy.props.PointerProperty(type=UMODELTOOLS_PG_scene_properties)
     bpy.types.Object.umodel_tools_asset = bpy.props.PointerProperty(type=UMODELTOOLS_PG_asset)
 
+
 def bl_unregister():
     del bpy.types.Scene.umodel_tools
     del bpy.types.Object.umodel_tools_asset

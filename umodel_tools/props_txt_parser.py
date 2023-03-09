@@ -8,15 +8,17 @@ with open(os.path.join(os.path.dirname(__file__), 'props_txt_grammar.lark')) as 
     lark_parser = lark.Lark(f, parser='earley', propagate_positions=True, ambiguity='resolve')
 
 
-t.overload
+@t.overload
 def parse_props_txt(props_txt_path: str, mode: t.Literal['MESH']) -> list[str]:
     ...
 
-t.overload
+
+@t.overload
 def parse_props_txt(props_txt_path: str,
                     mode: t.Literal['MATERIAL']
-                   ) -> tuple[dict[str, str], dict[str, str | float | bool]]:
+                    ) -> tuple[dict[str, str], dict[str, str | float | bool]]:
     ...
+
 
 def parse_props_txt(props_txt_path: str,
                     mode: t.Literal['MESH'] | t.Literal['MATERIAL']

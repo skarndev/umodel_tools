@@ -81,8 +81,3 @@ class AssetDB:
 
             for uid, (full_path, simple_path) in self._catalogs.items():
                 f.write(f"{uid}:{full_path}:{simple_path}\n")
-
-
-
-
-

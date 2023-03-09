@@ -75,6 +75,7 @@ TEXTURE_PARAM_NAME_TRS = {
     "MRO Map A": TextureMapTypes.MROH
 }
 
+
 def _get_object_aabb_verts(obj: bpy.types.Object) -> list[tuple[float, float, float]]:
     return [obj.matrix_world @ mu.Vector(corner) for corner in obj.bound_box]
 
@@ -139,7 +140,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                     asset_dir: str,
                     asset_path: str,
                     umodel_export_dir: str
-                   ) -> bpy.types.Object | None:
+                    ) -> bpy.types.Object | None:
         """Loads the asset from library dir, or adds it to library and loads it.
 
         :param context: Current Blender context.
@@ -154,7 +155,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         try:
             if not os.path.isfile(asset_path_abs):
                 self._import_asset_to_library(context=context, asset_library_dir=asset_dir, asset_path=asset_path,
-                                            umodel_export_dir=umodel_export_dir)
+                                              umodel_export_dir=umodel_export_dir)
 
             with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
                 data_to.objects = [obj for obj in data_from.objects]
@@ -180,7 +181,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         img = bpy.data.images.load(filepath=tex_lib_path)
         img.asset_mark()
         img.asset_data.catalog_id = db.uid_for_entry(os.path.dirname(tex_path))
-        #img.asset_generate_preview()
+        # img.asset_generate_preview()
 
         tex_lib_blend_path = os.path.splitext(tex_lib_path)[0] + '.blend'
 
@@ -384,7 +385,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
             else:
                 new_mat.node_tree.links.new(img_node.outputs['Color'], bsdf.inputs['Color'])
 
-        #new_mat.asset_generate_preview()
+        # new_mat.asset_generate_preview()
 
         material_lib_path = os.path.join(asset_library_dir, material_path_local_no_ext) + '.blend'
         os.makedirs(os.path.dirname(material_lib_path), exist_ok=True)
@@ -396,7 +397,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                                  asset_library_dir: str,
                                  asset_path: str,
                                  umodel_export_dir: str
-                                ) -> None:
+                                 ) -> None:
         """Import asset (mesh) to an assset library from UModel output.
 
         :param context: Current Blender context.
@@ -426,18 +427,18 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         psk_ctx.collection = temp_scene.collection
         psk_ctx.view_layer = temp_scene.view_layers[0]
 
-        if os.path.isfile(pskx_path:= asset_psk_path_noext + '.pskx'):
+        if os.path.isfile(pskx_path := asset_psk_path_noext + '.pskx'):
             if not pskimport(filepath=pskx_path,
-                                context=psk_ctx,
-                                bImportbone=False):
+                             context=psk_ctx,
+                             bImportbone=False):
                 bpy.data.scenes.remove(temp_scene, do_unlink=True)
                 raise RuntimeError(f"Failed importing asset f{asset_psk_path_noext + '.pskx'} due to unknown reason.")
 
             animated = False
-        elif os.path.isfile(psk_path:= asset_psk_path_noext + '.psk'):
+        elif os.path.isfile(psk_path := asset_psk_path_noext + '.psk'):
             if not pskimport(filepath=psk_path,
-                                context=psk_ctx,
-                                bImportbone=False):
+                             context=psk_ctx,
+                             bImportbone=False):
                 bpy.data.scenes.remove(temp_scene, do_unlink=True)
                 raise RuntimeError(f"Failed importing asset f{asset_psk_path_noext + '.psk'} due to unknown reason.")
             animated = True
@@ -463,10 +464,10 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                              "Materials might not be avaialble for the imported object.")
         else:
             # attempt to obtain materials manually if descriptor is not available
-            mat_desc_order_map = {mat.name : None for mat in obj.data.materials}
+            mat_desc_order_map = {mat.name: None for mat in obj.data.materials}
 
             if animated and not mat_descriptors_paths:
-                if os.path.isdir(mat_dir:= os.path.join(os.path.dirname(psk_path), 'Materials')):
+                if os.path.isdir(mat_dir := os.path.join(os.path.dirname(psk_path), 'Materials')):
                     for root, _, files in os.walk(mat_dir):
                         for file in files:
                             if not file.endswith('.props.txt'):
@@ -538,7 +539,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
             for mat in old_materials:
                 bpy.data.materials.remove(mat, do_unlink=True)
 
-        #obj.asset_generate_preview()
+        # obj.asset_generate_preview()
 
         asset_abs_lib_path = os.path.join(asset_library_dir, asset_path_local_noext) + '.blend'
         os.makedirs(os.path.dirname(asset_abs_lib_path), exist_ok=True)
@@ -669,7 +670,7 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
         vtx_target = np.array(_get_object_aabb_verts(target_obj_copy))
 
         pad = lambda x: np.hstack([x, np.ones((x.shape[0], 1))])
-        unpad = lambda x: x[:,:-1]
+        unpad = lambda x: x[:, :-1]
         X = pad(vtx_source)
         Y = pad(vtx_target)
 
@@ -698,8 +699,10 @@ def menu_func(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
     menu.layout.operator(UMODELTOOLS_OT_recover_unreal_asset.bl_idname)
     menu.layout.operator(UMODELTOOLS_OT_realign_asset.bl_idname)
 
+
 def bl_register():
     bpy.types.VIEW3D_MT_object.append(menu_func)
+
 
 def bl_unregister():
     bpy.types.VIEW3D_MT_object.remove(menu_func)

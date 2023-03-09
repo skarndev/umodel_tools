@@ -159,5 +159,5 @@ def toposort(deps_dict):
                 sorted_values.add(value)
             else:
                 unsorted.append(value)
-        deps_dict = {value : deps_dict[value] - sorted_values for value in unsorted}
+        deps_dict = {value: deps_dict[value] - sorted_values for value in unsorted}
     return sorted_list
