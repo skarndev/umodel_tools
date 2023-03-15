@@ -388,7 +388,8 @@ class AssetImporter:
                                  context: bpy.types.Context,
                                  asset_library_dir: str,
                                  asset_path: str,
-                                 umodel_export_dir: str
+                                 umodel_export_dir: str,
+                                 db: t.Optional[asset_db.AssetDB] = None
                                  ) -> None:
         """Import asset (mesh) to an assset library from UModel output.
 
@@ -396,12 +397,17 @@ class AssetImporter:
         :param asset_library_dir: Directory to store the asset, and its dependencies in.
         :param asset_path: Path to the asset in game format.
         :param umodel_export_dir: UModel output directory to source .psk files from.
+        :param db: Asset database to operate on. If given, no saving is performed, else the function handles
+        everything by itself.
         :raises OSError: Raised when an asset was not found in the UModel output dir or the failed opening.
         :raises FileNotFounderror: Raised when an asset was not found in the directory.
         :raises RuntimeError: Raised when an asset failed importing due to unknown .psk/.pskx importer issue.
         """
 
-        db = asset_db.AssetDB(asset_library_dir)
+        has_external_db = db is not None
+        if db is None:
+            db = asset_db.AssetDB(asset_library_dir)
+
         asset_local_dir = os.path.dirname(asset_path)
         catalog_uid = db.uid_for_entry(asset_local_dir) if asset_local_dir else None
         asset_absolute_dir = os.path.join(asset_library_dir, asset_local_dir)
@@ -448,6 +454,8 @@ class AssetImporter:
         obj.asset_data.catalog_id = catalog_uid
 
         # handle materials
+        new_materials = []
+
         # - read material descriptor file and identify associated materials
         try:
             mat_descriptors_paths = props_txt_parser.parse_props_txt(asset_psk_path_noext + '.props.txt', mode='MESH')
@@ -476,15 +484,26 @@ class AssetImporter:
                             mat_desc_order_map[mat_name] = f"{os.path.relpath(file_abs, umodel_export_dir)}.{mat_name}"
 
                     if any(mat_desc is None for mat_desc in mat_desc_order_map.values()):
-                        self._op_message('ERROR', "Material count mistmatch.")
+                        self._op_message('ERROR', "Material count mismatch.")
+                        mesh = obj.data
+
+                        # perform cleanup before raising
+                        for mat in old_materials:
+                            try:
+                                bpy.data.materials.remove(mat, do_unlink=True)
+                            except ReferenceError:
+                                pass
+
+                        bpy.data.objects.remove(obj, do_unlink=True)
+                        bpy.data.meshes.remove(mesh, do_unlink=True)
+                        bpy.data.scenes.remove(temp_scene, do_unlink=True)
+
                         raise FileNotFoundError()
 
                     mat_descriptors_paths = list(mat_desc_order_map.values())
 
             # replace materials
             old_materials = [mat for mat in obj.data.materials]
-
-            new_materials = []
 
             # initialize each material and populate it with data
             for mat_desc_path in mat_descriptors_paths:
@@ -543,7 +562,15 @@ class AssetImporter:
         os.makedirs(os.path.dirname(asset_abs_lib_path), exist_ok=True)
         bpy.data.libraries.write(asset_abs_lib_path, {obj, }, fake_user=True)
 
+        # cleanup
+        mesh = obj.data
         bpy.data.objects.remove(obj, do_unlink=True)
+        bpy.data.meshes.remove(mesh, do_unlink=True)
+
+        for mat in new_materials:
+            bpy.data.materials.remove(mat, do_unlink=True)
+
         bpy.data.scenes.remove(temp_scene, do_unlink=True)
 
-        db.save_db()
+        if not has_external_db:
+            db.save_db()

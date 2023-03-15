@@ -2,11 +2,29 @@ import typing as t
 import os
 import numpy as np
 import mathutils as mu
+import contextlib
+import sys
 
+import tqdm
+import tqdm.contrib
 import bpy
 
 from . import utils
 from . import asset_importer
+
+
+@contextlib.contextmanager
+def std_out_err_redirect_tqdm():
+    orig_out_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = map(tqdm.contrib.DummyTqdmFile, orig_out_err)
+        yield orig_out_err[0]
+    # Relay exceptions
+    except Exception as exc:
+        raise exc
+    # Always restore sys.stdout/err if necessary
+    finally:
+        sys.stdout, sys.stderr = orig_out_err
 
 
 def _get_object_aabb_verts(obj: bpy.types.Object) -> list[tuple[float, float, float]]:
@@ -152,20 +170,32 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
         if not os.path.isdir(asset_sub_dir_abs):
             return self._op_message('ERROR', f"Path {asset_sub_dir_abs} does not exist.")
 
+        # count assets to be imported for progress bar display purposes
+        total_models = 0
         for root, _, files in os.walk(asset_sub_dir_abs):
             for file in files:
-                file_base, ext = os.path.splitext(file)
+                _, ext = os.path.splitext(file)
                 if ext not in {'.psk', '.pskx'}:
                     continue
 
-                file_abs = os.path.join(root, file_base) + '.uasset'
-                file_rel = os.path.relpath(file_abs, umodel_export_dir)
+                total_models += 1
 
-                print(f"\n\nImporting asset {file_rel}...")
-                self._load_asset(context=context, asset_dir=os.path.normpath(asset_dir),
-                                 asset_path=file_rel,
-                                 umodel_export_dir=umodel_export_dir,
-                                 load=False)
+        with std_out_err_redirect_tqdm() as orig_stdout:
+            for root, _, files in tqdm.tqdm(os.walk(asset_sub_dir_abs), file=orig_stdout, dynamic_ncols=True,
+                                            total=total_models):
+                for file in files:
+                    file_base, ext = os.path.splitext(file)
+                    if ext not in {'.psk', '.pskx'}:
+                        continue
+
+                    file_abs = os.path.join(root, file_base) + '.uasset'
+                    file_rel = os.path.relpath(file_abs, umodel_export_dir)
+
+                    print(f"\n\nImporting asset {file_rel}...")
+                    self._load_asset(context=context, asset_dir=os.path.normpath(asset_dir),
+                                    asset_path=file_rel,
+                                    umodel_export_dir=umodel_export_dir,
+                                    load=False)
 
         print("Unrecognized texture types found:")
         print(self._unrecognized_texture_types)
