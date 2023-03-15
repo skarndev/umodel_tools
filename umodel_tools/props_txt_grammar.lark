@@ -1,21 +1,24 @@
 start: (definition)*
 
-definition: IDENTIFIER [ "[" INT_LITERAL "]" ] "=" (structured_block | path | const | const_list | weird_list) [","]
+definition: IDENTIFIER [ "[" INT_LITERAL "]" ] "=" (structured_block | const | path | empty_list | const_list) [","]
 
 structured_block: "{" (definition)* "}"
 path: path_type path_value
 path_type: IDENTIFIER
 path_value: SINGLE_QUOTED_STRING
 
-const_list: "{" [ANY_LITERAL ("," ANY_LITERAL)*] "}"
-weird_list: "{" (",")* "}"
-const: ANY_LITERAL | IDENTIFIER | call | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
-call.1: IDENTIFIER "(" ANY_LITERAL ")"
+const_list: "{" const ("," const)* "}"
+empty_list: "{" (",")* "}"
+const: ANY_LITERAL | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING | UNESCAPED_STRING
 
 // terminals
-    IDENTIFIER: /\b[a-zA-Z_ \/-][a-zA-Z0-9_ \/-]*\b/
+    COMMENT: "//" /[^\n]/*
+    %ignore COMMENT
 
-    ANY_LITERAL: NUMERIC_LITERAL | BOOL_LITERAL
+    UNESCAPED_STRING: /[^,}\n]+/
+    IDENTIFIER.1: /[A-Za-z_][A-Za-z0-9_]*/
+
+    ANY_LITERAL.1: NUMERIC_LITERAL | BOOL_LITERAL
     NUMERIC_LITERAL: ["+"|"-"] (INT_LITERAL | DOUBLE_LITERAL)
 
     BOOL_LITERAL: /\btrue\b|\bfalse\b/

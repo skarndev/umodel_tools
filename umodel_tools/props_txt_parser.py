@@ -29,9 +29,11 @@ def parse_props_txt(props_txt_path: str,
     :param props_txt_path: Path to the prop.txt file.
     :param mode: Mode of parsing, either mesh properties or texture properties.
     :raises NotImplementedError: Raised when not supported mode is passed.
-    :raises OSError: Raised when reading the file failed.
+    :raises OSError: Raised when file could not be opened.
+    :raises RuntimeError: Raised when reading the file failed.
     :return: A list of relative paths (game format paths).
     """
+    print(f"Parsing {props_txt_path}...")
     with open(props_txt_path, 'r') as f:
         text = f.read()
 
@@ -40,7 +42,7 @@ def parse_props_txt(props_txt_path: str,
         except lark.UnexpectedInput as e:
             print(f"ERROR: Failed parsing {props_txt_path}.")
             traceback.print_exc()
-            raise OSError()
+            raise RuntimeError
 
         match mode:
             case 'MESH':
@@ -84,12 +86,15 @@ def parse_props_txt(props_txt_path: str,
                                 _, _, tex_param = tex_param_def.children
                                 param_info, param_val, _ = tex_param.children
                                 _, _, path_desc = param_val.children
-                                assert path_desc.data == 'path'
+
+                                # ignore unused materials
+                                if path_desc.data != 'path':
+                                    continue
 
                                 _, path_value = path_desc.children
 
                                 tex_path = path_value.children[0].value[1:][:-1]
-                                tex_type = param_info.children[2].children[0].children[2].children[0].value
+                                tex_type = param_info.children[2].children[0].children[2].children[0].value.strip()
 
                                 texture_infos[tex_type] = tex_path
                         case 'BasePropertyOverrides':
@@ -104,7 +109,7 @@ def parse_props_txt(props_txt_path: str,
 
                                 match prop_name:
                                     case 'BlendMode':
-                                        prop_value = prop_value.children[0].children[0].value
+                                        prop_value = prop_value.children[0].value.strip()
                                     case 'TwoSided':
                                         prop_value = prop_value.children[0].value == 'true'
                                     case 'OpacityMaskClipValue':

@@ -1,5 +1,4 @@
 import enum
-import sys
 import typing as t
 import os
 import shutil
@@ -80,17 +79,10 @@ def _get_object_aabb_verts(obj: bpy.types.Object) -> list[tuple[float, float, fl
     return [obj.matrix_world @ mu.Vector(corner) for corner in obj.bound_box]
 
 
-class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
-    bl_idname = "umodel_tools.recover_unreal_asset"
-    bl_label = "Recover Unreal Asset"
-    bl_description = "Replaces selected object with an Unreal Engine asset from UModel dir, or attempts " \
-                     "to transfer data to it, such as UV maps and materials"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    asset_path: bpy.props.StringProperty(
-        name="Asset path",
-        description="Path to an alleged asset within the game"
-    )
+class AssetImporter:
+    """Implements functionality of asset import from UModel output.
+       Intended to be inherited a bpy.types.Operator subclass.
+    """
 
     load_pbr_maps: bpy.props.BoolProperty(
         name="Load PBR textures",
@@ -116,6 +108,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         default='.png'
     )
 
+    _unrecognized_texture_types: set[str] = set()
+
     def _op_message(self, type: t.Literal['INFO'] | t.Literal['ERROR'] | t.Literal['WARNING'], msg: str):
         """Print operator message and return the associated status-code.
 
@@ -139,7 +133,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                     context: bpy.types.Context,
                     asset_dir: str,
                     asset_path: str,
-                    umodel_export_dir: str
+                    umodel_export_dir: str,
+                    load: bool = True
                     ) -> bpy.types.Object | None:
         """Loads the asset from library dir, or adds it to library and loads it.
 
@@ -147,6 +142,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         :param asset_dir: Asset library directory.
         :param asset_path: Asset path in game format.
         :param umodel_export_dir: UModel output directory.
+        :param load: If False, the asset will be imported to the library, but no the current scene.
         :return: Object reference or None (if object was not found or failed loading due to filesystem errors).
         """
         asset_path_abs_no_ext = os.path.join(asset_dir, os.path.splitext(asset_path)[0])
@@ -157,11 +153,12 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                 self._import_asset_to_library(context=context, asset_library_dir=asset_dir, asset_path=asset_path,
                                               umodel_export_dir=umodel_export_dir)
 
-            with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
-                data_to.objects = [obj for obj in data_from.objects]
-                assert len(data_to.objects) == 1
+            if load:
+                with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
+                    data_to.objects = [obj for obj in data_from.objects]
+                    assert len(data_to.objects) == 1
 
-            return data_to.objects[0]
+                return data_to.objects[0]
 
         except RuntimeError as e:
             traceback.print_exc()
@@ -205,7 +202,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         :param db: Blender AssetDB.
         :param umodel_export_dir: UModel export directory.
         :param asset_library_dir: Asset library directory.
-        :raises OSError: Raised when material properties (.props.txt) file was not found or failed to open.
+        :raises RuntimeError: Raised when material properties (.props.txt) file was not found or failed to open.
         """
         material_path_local_no_ext = os.path.splitext(os.path.splitext(material_path_local)[0])[0]  # remove .props.txt
 
@@ -231,18 +228,18 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
                 if (blend_mode := base_prop_overrides.get('BlendMode')) is not None:
                     match blend_mode:
-                        case 'BLEND_Opaque':
+                        case 'BLEND_Opaque (0)':
                             pass
-                        case 'BLEND_Additive':
+                        case 'BLEND_Masked (1)':
+                            new_mat.blend_method = 'CLIP'
+                        case 'BLEND_Translucent (2)':
+                            new_mat.blend_method = 'BLEND'
+                        case 'BLEND_Additive (3)':
                             special_blend_mode = SpecialBlendingMode.Add
                             new_mat.blend_method = 'BLEND'
-                        case 'BLEND_Translucent':
-                            new_mat.blend_method = 'BLEND'
-                        case 'BLEND_Modulate':
+                        case 'BLEND_Modulate (4)':
                             special_blend_mode = SpecialBlendingMode.Mod
                             new_mat.blend_method = 'BLEND'
-                        case 'BLEND_Masked':
-                            new_mat.blend_method = 'CLIP'
                         case _:
                             self._op_message('WARNING', f"Unknown blending mode \'{blend_mode}\' found on importing "
                                                         f"material \"{material_name}\".")
@@ -297,11 +294,12 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
         for tex_type, tex_path_and_name in texture_infos.items():
             # skip the texture if we don't know what to do with it
-            if (tex_type := TEXTURE_PARAM_NAME_TRS.get(tex_type)) is None:
+            if (bl_tex_type := TEXTURE_PARAM_NAME_TRS.get(tex_type)) is None:
+                self._unrecognized_texture_types.add(tex_type)
                 continue
 
             # skip non-diffuse textures if we do not import PBR
-            if not self.load_pbr_maps and tex_type is not TextureMapTypes.Diffuse:
+            if not self.load_pbr_maps and bl_tex_type is not TextureMapTypes.Diffuse:
                 continue
 
             tex_path_no_ext, _ = os.path.splitext(tex_path_and_name)
@@ -345,7 +343,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                 # Note: we presume MROH and SRO are mutually exclusive and never appear together.
                 # This is not validated.
 
-                match tex_type:
+                match bl_tex_type:
                     case TextureMapTypes.Diffuse:
                         new_mat.node_tree.links.new(img_node.outputs['Color'], ao_mix.inputs[6])
                     case TextureMapTypes.Normal:
@@ -533,11 +531,17 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
                 new_materials.append(new_mat)
 
             for i, mat in enumerate(new_materials):
-                obj.data.materials[i] = mat
+                if len(obj.data.materials) > i:
+                    obj.data.materials[i] = mat
+                else:
+                    obj.data.materials.append(mat)
 
             # remove original materials
             for mat in old_materials:
-                bpy.data.materials.remove(mat, do_unlink=True)
+                try:
+                    bpy.data.materials.remove(mat, do_unlink=True)
+                except ReferenceError:
+                    pass
 
         # obj.asset_generate_preview()
 
@@ -550,6 +554,19 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
         db.save_db()
 
+
+class UMODELTOOLS_OT_recover_unreal_asset(AssetImporter, bpy.types.Operator):
+    bl_idname = "umodel_tools.recover_unreal_asset"
+    bl_label = "Recover Unreal Asset"
+    bl_description = "Replaces selected object with an Unreal Engine asset from UModel dir, or attempts " \
+                     "to transfer data to it, such as UV maps and materials"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    asset_path: bpy.props.StringProperty(
+        name="Asset path",
+        description="Path to an alleged asset within the game"
+    )
+
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[int] | set[str]:
         wm: bpy.types.WindowManager = context.window_manager
 
@@ -561,7 +578,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
         scene: bpy.types.Scene = context.scene
         selected_objects: t.Sequence[selected_objects] = context.selected_objects
-        umodel_export_dir: str = scene.umodel_tools.umodel_export_dir
+        umodel_export_dir: str = os.path.normpath(scene.umodel_tools.umodel_export_dir)
+        umodel_export_dir = umodel_export_dir[1:] if umodel_export_dir.startswith(os.sep) else umodel_export_dir
 
         if not umodel_export_dir:
             return self._op_message('ERROR', "You need to specify a UModel export dir in Scene properties.")
@@ -569,7 +587,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
         if not os.path.isdir(umodel_export_dir):
             return self._op_message('ERROR', f"Path to UModel export dir {umodel_export_dir} does not exist.")
 
-        asset_dir: str = scene.umodel_tools.asset_dir
+        asset_dir: str = os.path.normpath(scene.umodel_tools.asset_dir)
+        asset_dir = asset_dir[1:] if asset_dir.startswith(os.sep) else asset_dir
 
         if not asset_dir:
             return self._op_message('ERROR', "You need to specify an asset dir in Scene properties.")
@@ -579,9 +598,8 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
 
         asset_path = os.path.normpath(self.asset_path)
         asset_path = asset_path[1:] if asset_path.startswith(os.sep) else asset_path
-        asset = self._load_asset(context=context, asset_dir=os.path.normpath(asset_dir),
-                                 asset_path=os.path.normpath(asset_path),
-                                 umodel_export_dir=os.path.normpath(umodel_export_dir))
+        asset = self._load_asset(context=context, asset_dir=asset_dir, asset_path=asset_path,
+                                 umodel_export_dir=umodel_export_dir)
 
         if asset is None:
             self._op_message('ERROR', "Failed to import asset.")
@@ -624,6 +642,76 @@ class UMODELTOOLS_OT_recover_unreal_asset(bpy.types.Operator):
             new_obj.scale = (5, 5, 5)
             context.collection.objects.link(new_obj)
             new_obj.select_set(True)
+
+        return {'FINISHED'}
+
+
+class UMODELTOOLS_OT_import_unreal_assets(AssetImporter, bpy.types.Operator):
+    bl_idname = "umodel_tools.import_unreal_assets"
+    bl_label = "Import Unreal Assets"
+    bl_description = "Imports a subdirectory of assets to the specified asset directory"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    asset_sub_dir: bpy.props.StringProperty(
+        name="Asset subdir",
+        description="Path to a subdirectory containing assets"
+    )
+
+    def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[int] | set[str]:
+        wm: bpy.types.WindowManager = context.window_manager
+
+        return wm.invoke_props_dialog(self)
+
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        if not self.asset_sub_dir:
+            return self._op_message('ERROR', "Asset path was not provided.")
+
+        self._unrecognized_texture_types.clear()
+        scene: bpy.types.Scene = context.scene
+        selected_objects: t.Sequence[selected_objects] = context.selected_objects
+        umodel_export_dir: str = os.path.normpath(scene.umodel_tools.umodel_export_dir)
+        umodel_export_dir = umodel_export_dir[1:] if umodel_export_dir.startswith(os.sep) else umodel_export_dir
+
+        if not umodel_export_dir:
+            return self._op_message('ERROR', "You need to specify a UModel export dir in Scene properties.")
+
+        if not os.path.isdir(umodel_export_dir):
+            return self._op_message('ERROR', f"Path to UModel export dir {umodel_export_dir} does not exist.")
+
+        asset_dir: str = os.path.normpath(scene.umodel_tools.asset_dir)
+        asset_dir = asset_dir[1:] if asset_dir.startswith(os.sep) else asset_dir
+
+        if not asset_dir:
+            return self._op_message('ERROR', "You need to specify an asset dir in Scene properties.")
+
+        if not os.path.isdir(asset_dir):
+            return self._op_message('ERROR', f"Path to asset dir {asset_dir} does not exist.")
+
+        asset_sub_dir = os.path.normpath(self.asset_sub_dir)
+        asset_sub_dir = asset_sub_dir[1:] if asset_sub_dir.startswith(os.sep) else asset_sub_dir
+        asset_sub_dir_abs = os.path.join(umodel_export_dir, asset_sub_dir)
+
+        if not os.path.isdir(asset_sub_dir_abs):
+            return self._op_message('ERROR', f"Path {asset_sub_dir_abs} does not exist.")
+
+        for root, _, files in os.walk(asset_sub_dir_abs):
+            for file in files:
+                file_base, ext = os.path.splitext(file)
+                if ext not in {'.psk', '.pskx'}:
+                    continue
+
+                file_abs = os.path.join(root, file_base) + '.uasset'
+                file_rel = os.path.relpath(file_abs, umodel_export_dir)
+
+                print(f"\n\nImporting asset {file_rel}...")
+                self._load_asset(context=context, asset_dir=os.path.normpath(asset_dir),
+                                 asset_path=file_rel,
+                                 umodel_export_dir=umodel_export_dir,
+                                 load=False)
+
+        print("Unrecognized texture types found:")
+        print(self._unrecognized_texture_types)
+        self._unrecognized_texture_types.clear()
 
         return {'FINISHED'}
 
@@ -697,6 +785,7 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
 
 def menu_func(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
     menu.layout.operator(UMODELTOOLS_OT_recover_unreal_asset.bl_idname)
+    menu.layout.operator(UMODELTOOLS_OT_import_unreal_assets.bl_idname)
     menu.layout.operator(UMODELTOOLS_OT_realign_asset.bl_idname)
 
 
