@@ -4,13 +4,20 @@ import numpy as np
 import mathutils as mu
 import contextlib
 import sys
+import pexpect
+import pexpect.popen_spawn
+import signal
+import time
 
 import tqdm
 import tqdm.contrib
 import bpy
+import bpy_extras.io_utils
 
 from . import utils
 from . import asset_importer
+from . import asset_db
+from . import map_importer
 
 
 @contextlib.contextmanager
@@ -75,7 +82,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
         asset_path = os.path.normpath(self.asset_path)
         asset_path = asset_path[1:] if asset_path.startswith(os.sep) else asset_path
         asset = self._load_asset(context=context, asset_dir=asset_dir, asset_path=asset_path,
-                                 umodel_export_dir=umodel_export_dir)
+                                 umodel_export_dir=umodel_export_dir, overwrite_existing=self.overwrite_existing)
 
         if asset is None:
             self._op_message('ERROR', "Failed to import asset.")
@@ -133,7 +140,13 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
         description="Path to a subdirectory containing assets"
     )
 
-    def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[int] | set[str]:
+    render_previews: bpy.props.BoolProperty(
+        name="Render previews",
+        description="Render previews for assets",
+        default=False
+    )
+
+    def invoke(self, context: bpy.types.Context, _: bpy.types.Event) -> set[int] | set[str]:
         wm: bpy.types.WindowManager = context.window_manager
 
         return wm.invoke_props_dialog(self)
@@ -180,26 +193,129 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
 
                 total_models += 1
 
+        db = asset_db.AssetDB(asset_dir)
         with std_out_err_redirect_tqdm() as orig_stdout:
-            for root, _, files in tqdm.tqdm(os.walk(asset_sub_dir_abs), file=orig_stdout, dynamic_ncols=True,
-                                            total=total_models):
-                for file in files:
-                    file_base, ext = os.path.splitext(file)
-                    if ext not in {'.psk', '.pskx'}:
-                        continue
+            with tqdm.tqdm(total=total_models, file=orig_stdout, dynamic_ncols=True, ascii=True,
+                           desc="Importing assets") as progress_bar:
+                for root, _, files in os.walk(asset_sub_dir_abs):
+                    for file in files:
+                        file_base, ext = os.path.splitext(file)
+                        if ext not in {'.psk', '.pskx'}:
+                            continue
 
-                    file_abs = os.path.join(root, file_base) + '.uasset'
-                    file_rel = os.path.relpath(file_abs, umodel_export_dir)
+                        file_abs = os.path.join(root, file_base) + '.uasset'
+                        file_rel = os.path.relpath(file_abs, umodel_export_dir)
 
-                    print(f"\n\nImporting asset {file_rel}...")
-                    self._load_asset(context=context, asset_dir=os.path.normpath(asset_dir),
-                                    asset_path=file_rel,
-                                    umodel_export_dir=umodel_export_dir,
-                                    load=False)
+                        print(f"\n\nImporting asset {file_rel}...")
+                        self._load_asset(context=context,
+                                         asset_dir=asset_dir,
+                                         asset_path=file_rel,
+                                         umodel_export_dir=umodel_export_dir,
+                                         load=False,
+                                         db=db,
+                                         overwrite_existing=self.overwrite_existing)
+
+                        progress_bar.update(1)
+
+        db.save_db()
+
+        if self.render_previews:
+            with tqdm.tqdm(total=total_models, file=orig_stdout, dynamic_ncols=True, ascii=True,
+                           desc="Rendering previews") as progress_bar:
+                for root, _, files in os.walk(os.path.join(asset_dir, asset_sub_dir)):
+                    for file in files:
+                        if not file.endswith('.blend'):
+                            continue
+
+                        proc = pexpect.popen_spawn.PopenSpawn(f"\"{bpy.app.binary_path}\" "
+                                                              f"\"{os.path.join(root, file)}\" "
+                                                              "-b --python-console --factory-startup ")
+                        proc.expect_exact('>>>')
+                        time.sleep(0.1)
+                        proc.sendline("import bpy; import umodel_tools.preview_generator as g; g.render_previews()")
+                        proc.expect_exact('>>>')
+
+                        proc.sendline("g.is_finished()")
+                        while not bool(proc.expect_exact(['False', 'True'])):
+                            proc.expect_exact('>>>')
+                            proc.sendline("g.is_finished()")
+
+                        proc.expect_exact('>>>')
+
+                        time.sleep(5)
+
+                        proc.sendline('bpy.ops.wm.save_mainfile(check_existing=False)')
+                        proc.expect_exact('>>>')
+                        proc.kill(signal.SIGTERM)
+
+                        progress_bar.update(1)
 
         print("Unrecognized texture types found:")
         print(self._unrecognized_texture_types)
         self._unrecognized_texture_types.clear()
+
+        return {'FINISHED'}
+
+
+class UMODELTOOLS_OT_import_unreal_map(map_importer.MapImporter, bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
+    bl_idname = "umodel_tools.import_unreal_map"
+    bl_label = "Import Unreal Map"
+    bl_description = "Imports an Unreal Engine 4 map (.umap -> FModel .json)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # ImportHelper
+
+    filename_ext = ".json"
+
+    filter_glob: bpy.props.StringProperty(
+        default="*.json",
+        options={'HIDDEN'},
+        maxlen=255
+    )
+
+    files: bpy.props.CollectionProperty(
+        name="Unreal Engine 4 map (FModel .json)",
+        type=bpy.types.OperatorFileListElement,
+    )
+
+    directory: bpy.props.StringProperty(subtype='DIR_PATH')
+
+    # end ImportHelper
+
+    render_previews: bpy.props.BoolProperty(
+        name="Render previews",
+        description="Render previews for assets",
+        default=False
+    )
+
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        scene: bpy.types.Scene = context.scene
+        selected_objects: t.Sequence[selected_objects] = context.selected_objects
+        umodel_export_dir: str = os.path.normpath(scene.umodel_tools.umodel_export_dir)
+        umodel_export_dir = umodel_export_dir[1:] if umodel_export_dir.startswith(os.sep) else umodel_export_dir
+
+        if not umodel_export_dir:
+            return self._op_message('ERROR', "You need to specify a UModel export dir in Scene properties.")
+
+        if not os.path.isdir(umodel_export_dir):
+            return self._op_message('ERROR', f"Path to UModel export dir {umodel_export_dir} does not exist.")
+
+        asset_dir: str = os.path.normpath(scene.umodel_tools.asset_dir)
+        asset_dir = asset_dir[1:] if asset_dir.startswith(os.sep) else asset_dir
+
+        if not asset_dir:
+            return self._op_message('ERROR', "You need to specify an asset dir in Scene properties.")
+
+        if not os.path.isdir(asset_dir):
+            return self._op_message('ERROR', f"Path to asset dir {asset_dir} does not exist.")
+
+        db = asset_db.AssetDB(asset_dir)
+
+        for file in self.files:
+            self._import_map(context=context, umodel_export_dir=umodel_export_dir, asset_dir=asset_dir, db=db,
+                             map_path=os.path.join(self.directory, file.name))
+
+        db.save_db()
 
         return {'FINISHED'}
 
@@ -271,15 +387,21 @@ class UMODELTOOLS_OT_realign_asset(bpy.types.Operator):
         return {'FINISHED'}
 
 
-def menu_func(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
+def menu_func_object(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
     menu.layout.operator(UMODELTOOLS_OT_recover_unreal_asset.bl_idname)
     menu.layout.operator(UMODELTOOLS_OT_import_unreal_assets.bl_idname)
     menu.layout.operator(UMODELTOOLS_OT_realign_asset.bl_idname)
 
 
+def menu_func_import(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
+    menu.layout.operator(UMODELTOOLS_OT_import_unreal_map.bl_idname)
+
+
 def bl_register():
-    bpy.types.VIEW3D_MT_object.append(menu_func)
+    bpy.types.VIEW3D_MT_object.append(menu_func_object)
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
 def bl_unregister():
-    bpy.types.VIEW3D_MT_object.remove(menu_func)
+    bpy.types.VIEW3D_MT_object.remove(menu_func_object)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)

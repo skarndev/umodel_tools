@@ -22,6 +22,10 @@ import traceback
 
 import bpy
 
+import faulthandler
+
+faulthandler.enable()
+
 # include custom lib vendoring dir
 parent_dir = os.path.abspath(os.path.dirname(__file__))
 vendor_dir = os.path.join(parent_dir, 'third_party')

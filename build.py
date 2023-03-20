@@ -48,12 +48,12 @@ def create_distribution(dist_path: t.Optional[str]):
     else:
         yield None
 
+
 def build_project(no_req: bool, dist_path: t.Optional[str]):
     start_time = time.time()
 
     print_info('\nBuilding UModelTools...')
     print(f'Python third-party modules: {"OFF" if no_req else "ON"}')
-
 
     try:
         from pip import main as pipmain
@@ -71,7 +71,8 @@ def build_project(no_req: bool, dist_path: t.Optional[str]):
 
             def install_requirements(f):
                 for line in f.readlines():
-                    status = subprocess.call([PYTHON_PATH, '-m', 'pip', 'install', line, '-t', 'umodel_tools/third_party', '--upgrade'])
+                    status = subprocess.call([PYTHON_PATH, '-m', 'pip', 'install', line, '-t',
+                                             'umodel_tools/third_party', '--upgrade'])
                     if status:
                         print('\nError: failed installing module \"{}\". See pip error above.'.format(line))
                         sys.exit(1)
@@ -82,16 +83,16 @@ def build_project(no_req: bool, dist_path: t.Optional[str]):
         else:
             print_info("Warning: Third-party Python modules will not be installed. (--noreq option)")
 
-    print_succes('UmodelTools building finished successfully.',
-       "Total build time: ", time.strftime("%M minutes %S seconds\a", time.gmtime(time.time() - start_time)))
+    print_succes("UmodelTools building finished successfully.",
+                 "Total build time: ", time.strftime("%M minutes %S seconds\a", time.gmtime(time.time() - start_time)))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build UModelTools."
                                                  "\n"
                                                  "\nRequired dependencies are:"
-                                                 "\n  pip (https://pip.pypa.io/en/stable/installation/)"
-
-                                     , formatter_class=argparse.RawTextHelpFormatter)
+                                                 "\n  pip (https://pip.pypa.io/en/stable/installation/)",
+                                     formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('--dist', type=str, help='create a distribution of WBS in specified directory')
     parser.add_argument('--noreq', action='store_true', help='do not pull python modules from PyPi')

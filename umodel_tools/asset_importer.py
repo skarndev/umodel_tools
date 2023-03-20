@@ -3,6 +3,7 @@ import os
 import traceback
 import shutil
 import enum
+import time
 
 from io_import_scene_unreal_psa_psk_280 import pskimport
 import bpy
@@ -128,7 +129,8 @@ class AssetImporter:
                     asset_dir: str,
                     asset_path: str,
                     umodel_export_dir: str,
-                    load: bool = True
+                    load: bool = True,
+                    db: t.Optional[asset_db.AssetDB] = None
                     ) -> bpy.types.Object | None:
         """Loads the asset from library dir, or adds it to library and loads it.
 
@@ -137,6 +139,8 @@ class AssetImporter:
         :param asset_path: Asset path in game format.
         :param umodel_export_dir: UModel output directory.
         :param load: If False, the asset will be imported to the library, but no the current scene.
+        :param db: Asset database to operate on. If given, no saving is performed, else the function handles
+        everything by itself.
         :return: Object reference or None (if object was not found or failed loading due to filesystem errors).
         """
         asset_path_abs_no_ext = os.path.join(asset_dir, os.path.splitext(asset_path)[0])
@@ -145,7 +149,7 @@ class AssetImporter:
         try:
             if not os.path.isfile(asset_path_abs):
                 self._import_asset_to_library(context=context, asset_library_dir=asset_dir, asset_path=asset_path,
-                                              umodel_export_dir=umodel_export_dir)
+                                              umodel_export_dir=umodel_export_dir, db=db)
 
             if load:
                 with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
@@ -154,7 +158,7 @@ class AssetImporter:
 
                 return data_to.objects[0]
 
-        except RuntimeError as e:
+        except (RuntimeError, FileNotFoundError):
             traceback.print_exc()
             return None
 
@@ -340,6 +344,8 @@ class AssetImporter:
                 match bl_tex_type:
                     case TextureMapTypes.Diffuse:
                         new_mat.node_tree.links.new(img_node.outputs['Color'], ao_mix.inputs[6])
+                        img_node.select = True
+                        new_mat.node_tree.nodes.active = img_node
                     case TextureMapTypes.Normal:
                         normal_map_node = new_mat.node_tree.nodes.new('ShaderNodeNormalMap')
                         new_mat.node_tree.links.new(normal_map_node.outputs['Normal'],
@@ -376,6 +382,8 @@ class AssetImporter:
             # just simply connect the diffuse map to the shader node, if we do not go the PBR route
             else:
                 new_mat.node_tree.links.new(img_node.outputs['Color'], bsdf.inputs['Color'])
+                img_node.select = True
+                new_mat.node_tree.nodes.active = img_node
 
         # new_mat.asset_generate_preview()
 
@@ -430,7 +438,7 @@ class AssetImporter:
                              context=psk_ctx,
                              bImportbone=False):
                 bpy.data.scenes.remove(temp_scene, do_unlink=True)
-                raise RuntimeError(f"Failed importing asset f{asset_psk_path_noext + '.pskx'} due to unknown reason.")
+                raise RuntimeError(f"Failed importing asset {asset_psk_path_noext + '.pskx'} due to unknown reason.")
 
             animated = False
         elif os.path.isfile(psk_path := asset_psk_path_noext + '.psk'):
@@ -438,12 +446,12 @@ class AssetImporter:
                              context=psk_ctx,
                              bImportbone=False):
                 bpy.data.scenes.remove(temp_scene, do_unlink=True)
-                raise RuntimeError(f"Failed importing asset f{asset_psk_path_noext + '.psk'} due to unknown reason.")
+                raise RuntimeError(f"Failed importing asset {asset_psk_path_noext + '.psk'} due to unknown reason.")
             animated = True
 
         else:
             bpy.data.scenes.remove(temp_scene, do_unlink=True)
-            raise FileNotFoundError(f"Failed importing asset f{asset_psk_path_noext} was not found (.psk/.pskx).")
+            raise FileNotFoundError(f"Failed importing asset {asset_psk_path_noext} was not found (.psk/.pskx).")
 
         # we presume that if the object is succesfully imported, there is exactly one object in the scene collection
         obj = temp_scene.collection.objects[0]
@@ -568,7 +576,10 @@ class AssetImporter:
         bpy.data.meshes.remove(mesh, do_unlink=True)
 
         for mat in new_materials:
-            bpy.data.materials.remove(mat, do_unlink=True)
+            try:
+                bpy.data.materials.remove(mat, do_unlink=True)
+            except ReferenceError:
+                pass
 
         bpy.data.scenes.remove(temp_scene, do_unlink=True)
 

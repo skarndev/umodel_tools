@@ -1,5 +1,6 @@
 import uuid
 import os
+import shutil
 
 
 class AssetDB:
@@ -81,3 +82,6 @@ class AssetDB:
 
             for uid, (full_path, simple_path) in self._catalogs.items():
                 f.write(f"{uid}:{full_path}:{simple_path}\n")
+
+        # write backup copy (required for Blender to not consider changes temporary)
+        shutil.copyfile(self._db_cats_path, f"{self._db_cats_path}~")
