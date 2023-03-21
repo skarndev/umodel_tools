@@ -82,7 +82,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
         asset_path = os.path.normpath(self.asset_path)
         asset_path = asset_path[1:] if asset_path.startswith(os.sep) else asset_path
         asset = self._load_asset(context=context, asset_dir=asset_dir, asset_path=asset_path,
-                                 umodel_export_dir=umodel_export_dir, overwrite_existing=self.overwrite_existing)
+                                 umodel_export_dir=umodel_export_dir)
 
         if asset is None:
             self._op_message('ERROR', "Failed to import asset.")
@@ -212,8 +212,7 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
                                          asset_path=file_rel,
                                          umodel_export_dir=umodel_export_dir,
                                          load=False,
-                                         db=db,
-                                         overwrite_existing=self.overwrite_existing)
+                                         db=db)
 
                         progress_bar.update(1)
 

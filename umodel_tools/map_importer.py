@@ -58,37 +58,37 @@ class StaticMesh:
     instance_transforms: list[InstanceTransform]
 
     # these are just properties to help with debugging
-    no_entity = False
-    no_mesh = False
-    no_path = False
-    no_per_instance_data = False
-    base_shape = False
-    is_instanced = False
+    no_entity: bool = False
+    no_mesh: bool = False
+    no_path: bool = False
+    no_per_instance_data: bool = False
+    base_shape: bool = False
+    is_instanced: bool = False
+    not_rendered: bool = False
 
     def __init__(self, json_entity: t.Any, entity_type: str) -> None:
         self.entity_name = json_entity.get("Outer", 'Error')
         self.instance_transforms = []
 
-
         if not (props := json_entity.get("Properties", None)):
-            print('Invalid Entity: Lacking property')
             self.no_entity = True
             return
 
         if not props.get("StaticMesh", None):
-            print('Invalid Property: does not contain a static mesh')
             self.no_mesh = True
             return
 
         if not (object_path := props.get("StaticMesh").get("ObjectPath", None)) or object_path == '':
-            print('Invalid StaticMesh: does not contain ObjectPath.')
             self.no_path = True
             return
 
         if 'BasicShapes' in object_path:
             # What is a BasicShape? Do we need these?
-            print('This is a BasicShape - skipping for now')
             self.base_shape = True
+            return
+
+        if (render_in_main_pass := props.get("bRenderInMainPass", None)) is not None and not render_in_main_pass:
+            self.not_rendered = True
             return
 
         objpath = split_object_path(object_path)
@@ -145,7 +145,7 @@ class StaticMesh:
                         if (rot := trs_data.get("Rotation", None)) is not None:
                             rot_quat = mu.Quaternion((rot.get("W"), rot.get("X"), rot.get("Y"), rot.get("Z")))
                             quat_to_euler: mu.Euler = rot_quat.to_euler()
-                            trs.rot_euler = (quat_to_euler.x, quat_to_euler.y, -quat_to_euler.z)
+                            trs.rot_euler = (-quat_to_euler.x, quat_to_euler.y, -quat_to_euler.z)
 
                         if (scale := trs_data.get("Scale3D", None)) is not None:
                             trs.scale = (scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1))
@@ -154,7 +154,8 @@ class StaticMesh:
 
     @property
     def invalid(self):
-        return self.no_path or self.no_entity or self.base_shape or self.no_mesh or self.no_per_instance_data
+        return (self.no_path or self.no_entity or self.base_shape or self.no_mesh or self.no_per_instance_data
+                or self.not_rendered)
 
     def link_object_instance(self,
                              obj: bpy.types.Object,
@@ -242,7 +243,10 @@ class GameLight:
         light_obj.scale = (self.scale[0], self.scale[1], self.scale[2])
         light_obj.location = (self.pos[0], self.pos[1], self.pos[2])
         light_obj.rotation_mode = 'XYZ'
-        light_obj.rotation_euler = mu.Euler((math.radians(self.rot[0]), math.radians(self.rot[1]), math.radians(self.rot[2])), 'XYZ')
+        light_obj.rotation_euler = mu.Euler((math.radians(self.rot[0]),
+                                             math.radians(self.rot[1]),
+                                             math.radians(self.rot[2])),
+                                             'XYZ')
         collection.objects.link(light_obj)
         bpy.context.scene.collection.objects.link(light_obj)
 

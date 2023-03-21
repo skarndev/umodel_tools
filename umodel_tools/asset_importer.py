@@ -70,7 +70,20 @@ TEXTURE_PARAM_NAME_TRS = {
     "MROH Map A": TextureMapTypes.MROH,
     "MROH/SROH Map A": TextureMapTypes.MROH,
     "MRO/SRO Map A": TextureMapTypes.MRO,
-    "MRO Map A": TextureMapTypes.MROH
+    "MRO Map A": TextureMapTypes.MROH,
+
+    "Diffuse A Map": TextureMapTypes.Diffuse,
+    "Normal A Map": TextureMapTypes.Normal,
+    "SRO A Map": TextureMapTypes.SRO,
+    "MRO/SRO A Map": TextureMapTypes.SRO,
+    "MROH A Map": TextureMapTypes.MROH,
+    "MROH/SROH A Map": TextureMapTypes.MROH,
+    "MRO/SRO A Map": TextureMapTypes.MRO,
+    "MRO A Map": TextureMapTypes.MROH,
+
+    "Color Glass": TextureMapTypes.Diffuse,
+    "Base color": TextureMapTypes.Diffuse,
+    "MROA": TextureMapTypes.MRO  # TODO: A stands for what?
 }
 
 
@@ -82,7 +95,7 @@ class AssetImporter:
     load_pbr_maps: bpy.props.BoolProperty(
         name="Load PBR textures",
         description="Load normal maps, specular, roughness, etc into materials. Experimental",
-        default=False
+        default=True
     )
 
     import_backface_culling: bpy.props.BoolProperty(
@@ -344,6 +357,7 @@ class AssetImporter:
                 match bl_tex_type:
                     case TextureMapTypes.Diffuse:
                         new_mat.node_tree.links.new(img_node.outputs['Color'], ao_mix.inputs[6])
+                        new_mat.node_tree.links.new(img_node.outputs['Alpha'], bsdf.inputs['Alpha'])
                         img_node.select = True
                         new_mat.node_tree.nodes.active = img_node
                     case TextureMapTypes.Normal:
@@ -381,9 +395,11 @@ class AssetImporter:
 
             # just simply connect the diffuse map to the shader node, if we do not go the PBR route
             else:
-                new_mat.node_tree.links.new(img_node.outputs['Color'], bsdf.inputs['Color'])
-                img_node.select = True
-                new_mat.node_tree.nodes.active = img_node
+                match bl_tex_type:
+                    case TextureMapTypes.Diffuse:
+                        new_mat.node_tree.links.new(img_node.outputs['Color'], bsdf.inputs['Color'])
+                        img_node.select = True
+                        new_mat.node_tree.nodes.active = img_node
 
         # new_mat.asset_generate_preview()
 
