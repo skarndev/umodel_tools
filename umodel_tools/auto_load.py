@@ -1,12 +1,12 @@
-import os
-import bpy
-import sys
 import typing
 import inspect
 import pkgutil
 import importlib
 from pathlib import Path
 from ordered_set import OrderedSet
+
+import bpy
+
 
 __all__ = (
     "init",

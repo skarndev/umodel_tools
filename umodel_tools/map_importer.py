@@ -65,6 +65,7 @@ class StaticMesh:
     base_shape: bool = False
     is_instanced: bool = False
     not_rendered: bool = False
+    invisible: bool = False
 
     def __init__(self, json_entity: t.Any, entity_type: str) -> None:
         self.entity_name = json_entity.get("Outer", 'Error')
@@ -90,6 +91,9 @@ class StaticMesh:
         if (render_in_main_pass := props.get("bRenderInMainPass", None)) is not None and not render_in_main_pass:
             self.not_rendered = True
             return
+
+        if (is_visbile := props.get("bVisible", None)) is not None and not is_visbile:
+            self.invisible = True
 
         objpath = split_object_path(object_path)
 
@@ -155,7 +159,7 @@ class StaticMesh:
     @property
     def invalid(self):
         return (self.no_path or self.no_entity or self.base_shape or self.no_mesh or self.no_per_instance_data
-                or self.not_rendered)
+                or self.not_rendered or self.invisible)
 
     def link_object_instance(self,
                              obj: bpy.types.Object,
@@ -246,7 +250,7 @@ class GameLight:
         light_obj.rotation_euler = mu.Euler((math.radians(self.rot[0]),
                                              math.radians(self.rot[1]),
                                              math.radians(self.rot[2])),
-                                             'XYZ')
+                                            'XYZ')
         collection.objects.link(light_obj)
         bpy.context.scene.collection.objects.link(light_obj)
 
@@ -265,12 +269,15 @@ class MapImporter(asset_importer.AssetImporter):
                     map_path: str,
                     umodel_export_dir: str,
                     asset_dir: str,
+                    game_profile: str,
                     db: t.Optional[asset_db.AssetDB] = None) -> bool:
         """Imports map placements to the current scene.
 
         :param map_path: Path to FModel .json output representing a .umap file.
         :param umodel_export_dir: UModel output directory.
         :param asset_dir: Asset library directory.
+        :param game_profile: Current game profile.
+        :param db: Asset database.
         :return: True if succesful, else False.
         """
 
@@ -306,7 +313,8 @@ class MapImporter(asset_importer.AssetImporter):
                         asset_path=static_mesh.asset_path,
                         umodel_export_dir=umodel_export_dir,
                         load=True,
-                        db=db
+                        db=db,
+                        game_profile=game_profile
                     )
 
                     if obj is None:

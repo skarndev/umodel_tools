@@ -18,6 +18,7 @@ from . import utils
 from . import asset_importer
 from . import asset_db
 from . import map_importer
+from . import preferences
 
 
 @contextlib.contextmanager
@@ -56,12 +57,18 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
         return wm.invoke_props_dialog(self)
 
     def execute(self, context: bpy.types.Context) -> set[str]:
+        self._unrecognized_texture_types.clear()
+
         if not self.asset_path:
             return self._op_message('ERROR', "Asset path was not provided.")
 
-        scene: bpy.types.Scene = context.scene
         selected_objects: t.Sequence[selected_objects] = context.selected_objects
-        umodel_export_dir: str = os.path.normpath(scene.umodel_tools.umodel_export_dir)
+
+        profile = preferences.get_addon_preferences().get_active_profile()
+        if profile is None:
+            return self._op_message('ERROR', "You need to have an active game profile selected.")
+
+        umodel_export_dir: str = os.path.normpath(profile.umodel_export_dir)
         umodel_export_dir = umodel_export_dir[1:] if umodel_export_dir.startswith(os.sep) else umodel_export_dir
 
         if not umodel_export_dir:
@@ -70,7 +77,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
         if not os.path.isdir(umodel_export_dir):
             return self._op_message('ERROR', f"Path to UModel export dir {umodel_export_dir} does not exist.")
 
-        asset_dir: str = os.path.normpath(scene.umodel_tools.asset_dir)
+        asset_dir: str = os.path.normpath(profile.asset_dir)
         asset_dir = asset_dir[1:] if asset_dir.startswith(os.sep) else asset_dir
 
         if not asset_dir:
@@ -82,7 +89,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
         asset_path = os.path.normpath(self.asset_path)
         asset_path = asset_path[1:] if asset_path.startswith(os.sep) else asset_path
         asset = self._load_asset(context=context, asset_dir=asset_dir, asset_path=asset_path,
-                                 umodel_export_dir=umodel_export_dir)
+                                 umodel_export_dir=umodel_export_dir, game_profile=profile.game)
 
         if asset is None:
             self._op_message('ERROR', "Failed to import asset.")
@@ -126,6 +133,10 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
             context.collection.objects.link(new_obj)
             new_obj.select_set(True)
 
+        print("Unrecognized texture types found:")
+        print(self._unrecognized_texture_types)
+        self._unrecognized_texture_types.clear()
+
         return {'FINISHED'}
 
 
@@ -156,9 +167,14 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
             return self._op_message('ERROR', "Asset path was not provided.")
 
         self._unrecognized_texture_types.clear()
-        scene: bpy.types.Scene = context.scene
+
         selected_objects: t.Sequence[selected_objects] = context.selected_objects
-        umodel_export_dir: str = os.path.normpath(scene.umodel_tools.umodel_export_dir)
+
+        profile = preferences.get_addon_preferences().get_active_profile()
+        if profile is None:
+            return self._op_message('ERROR', "You need to have an active game profile selected.")
+
+        umodel_export_dir: str = os.path.normpath(profile.umodel_export_dir)
         umodel_export_dir = umodel_export_dir[1:] if umodel_export_dir.startswith(os.sep) else umodel_export_dir
 
         if not umodel_export_dir:
@@ -167,7 +183,7 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
         if not os.path.isdir(umodel_export_dir):
             return self._op_message('ERROR', f"Path to UModel export dir {umodel_export_dir} does not exist.")
 
-        asset_dir: str = os.path.normpath(scene.umodel_tools.asset_dir)
+        asset_dir: str = os.path.normpath(profile.asset_dir)
         asset_dir = asset_dir[1:] if asset_dir.startswith(os.sep) else asset_dir
 
         if not asset_dir:
@@ -212,7 +228,8 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
                                          asset_path=file_rel,
                                          umodel_export_dir=umodel_export_dir,
                                          load=False,
-                                         db=db)
+                                         db=db,
+                                         game_profile=profile.game)
 
                         progress_bar.update(1)
 
@@ -288,9 +305,14 @@ class UMODELTOOLS_OT_import_unreal_map(map_importer.MapImporter, bpy.types.Opera
     )
 
     def execute(self, context: bpy.types.Context) -> set[str]:
-        scene: bpy.types.Scene = context.scene
+        self._unrecognized_texture_types.clear()
         selected_objects: t.Sequence[selected_objects] = context.selected_objects
-        umodel_export_dir: str = os.path.normpath(scene.umodel_tools.umodel_export_dir)
+
+        profile = preferences.get_addon_preferences().get_active_profile()
+        if profile is None:
+            return self._op_message('ERROR', "You need to have an active game profile selected.")
+
+        umodel_export_dir: str = os.path.normpath(profile.umodel_export_dir)
         umodel_export_dir = umodel_export_dir[1:] if umodel_export_dir.startswith(os.sep) else umodel_export_dir
 
         if not umodel_export_dir:
@@ -299,7 +321,7 @@ class UMODELTOOLS_OT_import_unreal_map(map_importer.MapImporter, bpy.types.Opera
         if not os.path.isdir(umodel_export_dir):
             return self._op_message('ERROR', f"Path to UModel export dir {umodel_export_dir} does not exist.")
 
-        asset_dir: str = os.path.normpath(scene.umodel_tools.asset_dir)
+        asset_dir: str = os.path.normpath(profile.asset_dir)
         asset_dir = asset_dir[1:] if asset_dir.startswith(os.sep) else asset_dir
 
         if not asset_dir:
@@ -312,9 +334,13 @@ class UMODELTOOLS_OT_import_unreal_map(map_importer.MapImporter, bpy.types.Opera
 
         for file in self.files:
             self._import_map(context=context, umodel_export_dir=umodel_export_dir, asset_dir=asset_dir, db=db,
-                             map_path=os.path.join(self.directory, file.name))
+                             map_path=os.path.join(self.directory, file.name), game_profile=profile.game)
 
         db.save_db()
+
+        print("Unrecognized texture types found:")
+        print(self._unrecognized_texture_types)
+        self._unrecognized_texture_types.clear()
 
         return {'FINISHED'}
 
@@ -396,11 +422,11 @@ def menu_func_import(menu: bpy.types.Menu, _: bpy.types.Context) -> None:
     menu.layout.operator(UMODELTOOLS_OT_import_unreal_map.bl_idname)
 
 
-def bl_register():
+def bl_register() -> None:
     bpy.types.VIEW3D_MT_object.append(menu_func_object)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
-def bl_unregister():
+def bl_unregister() -> None:
     bpy.types.VIEW3D_MT_object.remove(menu_func_object)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)

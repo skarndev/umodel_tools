@@ -2,89 +2,15 @@ import typing as t
 import os
 import traceback
 import shutil
-import enum
-import time
 
 from io_import_scene_unreal_psa_psk_280 import pskimport
 import bpy
 
+from . import enums
 from . import utils
 from . import asset_db
 from . import props_txt_parser
-
-
-class TextureMapTypes(enum.Enum):
-    """All texture map types supported by the material generator.
-    """
-
-    Diffuse = enum.auto()
-    Normal = enum.auto()
-    SRO = enum.auto()
-    MROH = enum.auto()
-    MRO = enum.auto()
-
-
-class SpecialBlendingMode(enum.Enum):
-    """List of special blenbing modes that require additional node generation.
-    """
-
-    #: Final color = Source color + Dest color.
-    Add = enum.auto()
-
-    #: Final color = Source color x Dest color.
-    Mod = enum.auto()
-
-
-#: Translates names retrieved from .props.txt into sensible texture map types
-TEXTURE_PARAM_NAME_TRS = {
-    "Diffuse": TextureMapTypes.Diffuse,
-    "Normal": TextureMapTypes.Normal,
-    "SRO": TextureMapTypes.SRO,
-    "MRO": TextureMapTypes.MRO,
-    "MROH": TextureMapTypes.MROH,
-    "MROH/SROH": TextureMapTypes.MROH,
-    "MRO/SRO": TextureMapTypes.MRO,
-
-    "Diffuse Map": TextureMapTypes.Diffuse,
-    "Normal Map": TextureMapTypes.Normal,
-    "MRO/SRO Map": TextureMapTypes.SRO,
-    "SRO Map": TextureMapTypes.SRO,
-    "MROH Map": TextureMapTypes.MROH,
-    "MROH/SROH Map": TextureMapTypes.MROH,
-    "MRO/SRO Map": TextureMapTypes.MRO,
-    "MRO Map": TextureMapTypes.MRO,
-
-    "Diffuse A": TextureMapTypes.Diffuse,
-    "Normal A": TextureMapTypes.Normal,
-    "SRO A": TextureMapTypes.SRO,
-    "MRO/SRO A": TextureMapTypes.SRO,
-    "MROH A": TextureMapTypes.MROH,
-    "MROH/SROH A": TextureMapTypes.MROH,
-    "MRO/SRO A": TextureMapTypes.MRO,
-    "MRO A": TextureMapTypes.MROH,
-
-    "Diffuse Map A": TextureMapTypes.Diffuse,
-    "Normal Map A": TextureMapTypes.Normal,
-    "SRO Map A": TextureMapTypes.SRO,
-    "MRO/SRO Map A": TextureMapTypes.SRO,
-    "MROH Map A": TextureMapTypes.MROH,
-    "MROH/SROH Map A": TextureMapTypes.MROH,
-    "MRO/SRO Map A": TextureMapTypes.MRO,
-    "MRO Map A": TextureMapTypes.MROH,
-
-    "Diffuse A Map": TextureMapTypes.Diffuse,
-    "Normal A Map": TextureMapTypes.Normal,
-    "SRO A Map": TextureMapTypes.SRO,
-    "MRO/SRO A Map": TextureMapTypes.SRO,
-    "MROH A Map": TextureMapTypes.MROH,
-    "MROH/SROH A Map": TextureMapTypes.MROH,
-    "MRO/SRO A Map": TextureMapTypes.MRO,
-    "MRO A Map": TextureMapTypes.MROH,
-
-    "Color Glass": TextureMapTypes.Diffuse,
-    "Base color": TextureMapTypes.Diffuse,
-    "MROA": TextureMapTypes.MRO  # TODO: A stands for what?
-}
+from . import game_profiles
 
 
 class AssetImporter:
@@ -142,6 +68,7 @@ class AssetImporter:
                     asset_dir: str,
                     asset_path: str,
                     umodel_export_dir: str,
+                    game_profile: str,
                     load: bool = True,
                     db: t.Optional[asset_db.AssetDB] = None
                     ) -> bpy.types.Object | None:
@@ -151,10 +78,12 @@ class AssetImporter:
         :param asset_dir: Asset library directory.
         :param asset_path: Asset path in game format.
         :param umodel_export_dir: UModel output directory.
+        :param game_profile: Game profile to import.
         :param load: If False, the asset will be imported to the library, but no the current scene.
         :param db: Asset database to operate on. If given, no saving is performed, else the function handles
         everything by itself.
         :return: Object reference or None (if object was not found or failed loading due to filesystem errors).
+        :raises NotImplementedError: Raised when requested game profile is not implemented or available.
         """
         asset_path_abs_no_ext = os.path.join(asset_dir, os.path.splitext(asset_path)[0])
         asset_path_abs = asset_path_abs_no_ext + '.blend'
@@ -162,7 +91,7 @@ class AssetImporter:
         try:
             if not os.path.isfile(asset_path_abs):
                 self._import_asset_to_library(context=context, asset_library_dir=asset_dir, asset_path=asset_path,
-                                              umodel_export_dir=umodel_export_dir, db=db)
+                                              umodel_export_dir=umodel_export_dir, db=db, game_profile=game_profile)
 
             if load:
                 with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
@@ -175,7 +104,11 @@ class AssetImporter:
             traceback.print_exc()
             return None
 
-    def _import_image_to_library(self, tex_path: str, tex_lib_path: str, tex_umodel_path: str, db: asset_db.AssetDB):
+    def _import_image_to_library(self,
+                                 tex_path: str,
+                                 tex_lib_path: str,
+                                 tex_umodel_path: str,
+                                 db: asset_db.AssetDB):
         """Import image texture to asset library from UModel output.
 
         :param tex_path: Path to texture in game format.
@@ -204,7 +137,8 @@ class AssetImporter:
                                     material_path_local: str,
                                     db: asset_db.AssetDB,
                                     umodel_export_dir: str,
-                                    asset_library_dir: str
+                                    asset_library_dir: str,
+                                    game_profile: str
                                     ) -> None:
         """Import material to asset library from UModel output.
 
@@ -213,21 +147,28 @@ class AssetImporter:
         :param db: Blender AssetDB.
         :param umodel_export_dir: UModel export directory.
         :param asset_library_dir: Asset library directory.
+        :param game_profile: Game profile to use.
         :raises RuntimeError: Raised when material properties (.props.txt) file was not found or failed to open.
+        :raises NotImplementedError: Raised when requested game profile is not implemented or available.
         """
+        game_profile_impl = game_profiles.GAME_HANDLERS.get(game_profile)
+
+        if game_profile_impl is None:
+            raise NotImplementedError(f"Requested game profile {game_profile} is not implemented/available.")
+
         material_path_local_no_ext = os.path.splitext(os.path.splitext(material_path_local)[0])[0]  # remove .props.txt
 
         # load texture infos, may throw OSError if file is not found.
-        texture_infos, base_prop_overrides = props_txt_parser.parse_props_txt(os.path.join(umodel_export_dir,
-                                                                              material_path_local),
-                                                                              mode='MATERIAL')
-
+        desc_ast, texture_infos, base_prop_overrides = props_txt_parser.parse_props_txt(os.path.join(umodel_export_dir,
+                                                                                        material_path_local),
+                                                                                        mode='MATERIAL')
         new_mat = bpy.data.materials.new(material_name)
         new_mat.asset_mark()
         new_mat.asset_data.catalog_id = db.uid_for_entry(material_path_local_no_ext)
         new_mat.use_nodes = True
         new_mat.node_tree.links.clear()
         new_mat.node_tree.nodes.clear()
+        game_profile_impl.process_material(mat=new_mat, desc_ast=desc_ast, use_pbr=self.load_pbr_maps)
 
         out = new_mat.node_tree.nodes.new('ShaderNodeOutputMaterial')
 
@@ -246,10 +187,10 @@ class AssetImporter:
                         case 'BLEND_Translucent (2)':
                             new_mat.blend_method = 'BLEND'
                         case 'BLEND_Additive (3)':
-                            special_blend_mode = SpecialBlendingMode.Add
+                            special_blend_mode = enums.SpecialBlendingMode.Add
                             new_mat.blend_method = 'BLEND'
                         case 'BLEND_Modulate (4)':
-                            special_blend_mode = SpecialBlendingMode.Mod
+                            special_blend_mode = enums.SpecialBlendingMode.Mod
                             new_mat.blend_method = 'BLEND'
                         case _:
                             self._op_message('WARNING', f"Unknown blending mode \'{blend_mode}\' found on importing "
@@ -265,14 +206,7 @@ class AssetImporter:
                 new_mat.use_backface_culling = True
 
             # create basic shader nodes and set their default values
-
             bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
-            # set defaults
-            bsdf.inputs[4].default_value = 1.01  # Subsurface IOR
-            bsdf.inputs[7].default_value = 0.0  # Specular
-            bsdf.inputs[9].default_value = 0.0  # Roughness
-            bsdf.inputs[13].default_value = 0.0  # Sheen Tint
-            bsdf.inputs[15].default_value = 0.0  # Clearcoat roughness
 
             ao_mix = new_mat.node_tree.nodes.new('ShaderNodeMix')
             ao_mix.data_type = 'RGBA'
@@ -285,7 +219,7 @@ class AssetImporter:
             match special_blend_mode:
                 case None:
                     new_mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
-                case SpecialBlendingMode.Add:
+                case enums.SpecialBlendingMode.Add:
                     transparent_bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfTransparent')
                     add_shader = new_mat.node_tree.nodes.new('ShaderNodeAddShader')
 
@@ -293,7 +227,7 @@ class AssetImporter:
                     new_mat.node_tree.links.new(transparent_bsdf.outputs['BSDF'], add_shader.inputs[1])
                     new_mat.node_tree.links.new(add_shader.outputs[0], out.inputs['Surface'])
 
-                case SpecialBlendingMode.Mod:
+                case enums.SpecialBlendingMode.Mod:
                     shader_to_rgb = new_mat.node_tree.nodes.new('ShaderNodeShaderToRGB')
                     transparent_bsdf = new_mat.node_tree.nodes.new('ShaderNodeBsdfTransparent')
                     new_mat.node_tree.links.new(bsdf.outputs['BSDF'], shader_to_rgb.inputs[0])
@@ -305,12 +239,13 @@ class AssetImporter:
 
         for tex_type, tex_path_and_name in texture_infos.items():
             # skip the texture if we don't know what to do with it
-            if (bl_tex_type := TEXTURE_PARAM_NAME_TRS.get(tex_type)) is None:
+
+            if not game_profile_impl.do_process_texture(tex_type):
                 self._unrecognized_texture_types.add(tex_type)
                 continue
 
             # skip non-diffuse textures if we do not import PBR
-            if not self.load_pbr_maps and bl_tex_type is not TextureMapTypes.Diffuse:
+            if not self.load_pbr_maps and not game_profile_impl.is_diffuse_tex_type(tex_type):
                 continue
 
             tex_path_no_ext, _ = os.path.splitext(tex_path_and_name)
@@ -351,57 +286,21 @@ class AssetImporter:
             img_node.image = img
 
             if self.load_pbr_maps:
-                # Note: we presume MROH and SRO are mutually exclusive and never appear together.
-                # This is not validated.
-
-                match bl_tex_type:
-                    case TextureMapTypes.Diffuse:
-                        new_mat.node_tree.links.new(img_node.outputs['Color'], ao_mix.inputs[6])
-                        new_mat.node_tree.links.new(img_node.outputs['Alpha'], bsdf.inputs['Alpha'])
-                        img_node.select = True
-                        new_mat.node_tree.nodes.active = img_node
-                    case TextureMapTypes.Normal:
-                        normal_map_node = new_mat.node_tree.nodes.new('ShaderNodeNormalMap')
-                        new_mat.node_tree.links.new(normal_map_node.outputs['Normal'],
-                                                    bsdf.inputs['Normal'])
-                        new_mat.node_tree.links.new(img_node.outputs['Color'],
-                                                    normal_map_node.inputs['Color'])
-                    case TextureMapTypes.SRO:
-                        sro_split = new_mat.node_tree.nodes.new('ShaderNodeSeparateColor')
-                        new_mat.node_tree.links.new(sro_split.outputs['Red'], bsdf.inputs['Specular'])
-                        new_mat.node_tree.links.new(sro_split.outputs['Green'], bsdf.inputs['Roughness'])
-                        new_mat.node_tree.links.new(sro_split.outputs['Blue'], ao_mix.inputs[7])
-                        new_mat.node_tree.links.new(img_node.outputs['Color'], sro_split.inputs['Color'])
-                    case TextureMapTypes.MROH:
-                        # MRO components
-                        mroh_split = new_mat.node_tree.nodes.new('ShaderNodeSeparateColor')
-                        new_mat.node_tree.links.new(mroh_split.outputs['Red'], bsdf.inputs['Metallic'])
-                        new_mat.node_tree.links.new(mroh_split.outputs['Green'], bsdf.inputs['Roughness'])
-                        new_mat.node_tree.links.new(mroh_split.outputs['Blue'], ao_mix.inputs[7])
-                        new_mat.node_tree.links.new(img_node.outputs['Color'], mroh_split.inputs['Color'])
-
-                        # height component
-                        displacement_node = new_mat.node_tree.nodes.new('ShaderNodeDisplacement')
-                        new_mat.node_tree.links.new(displacement_node.outputs['Displacement'],
-                                                    out.inputs['Displacement'])
-                        new_mat.node_tree.links.new(img_node.outputs['Alpha'],
-                                                    displacement_node.inputs['Height'])
-                    case TextureMapTypes.MRO:
-                        mro_split = new_mat.node_tree.nodes.new('ShaderNodeSeparateColor')
-                        new_mat.node_tree.links.new(mro_split.outputs['Red'], bsdf.inputs['Metallic'])
-                        new_mat.node_tree.links.new(mro_split.outputs['Green'], bsdf.inputs['Roughness'])
-                        new_mat.node_tree.links.new(mro_split.outputs['Blue'], ao_mix.inputs[7])
-                        new_mat.node_tree.links.new(img_node.outputs['Color'], mro_split.inputs['Color'])
-
+                game_profile_impl.handle_material_texture_pbr(mat=new_mat,
+                                                              tex_type=tex_type,
+                                                              img_node=img_node,
+                                                              ao_mix_node=ao_mix,
+                                                              bsdf_node=bsdf,
+                                                              out_node=out)
             # just simply connect the diffuse map to the shader node, if we do not go the PBR route
             else:
-                match bl_tex_type:
-                    case TextureMapTypes.Diffuse:
-                        new_mat.node_tree.links.new(img_node.outputs['Color'], bsdf.inputs['Color'])
-                        img_node.select = True
-                        new_mat.node_tree.nodes.active = img_node
+                game_profile_impl.handle_material_texture_simple(mat=new_mat,
+                                                                 tex_type=tex_type,
+                                                                 img_node=img_node,
+                                                                 bsdf_node=bsdf)
 
         # new_mat.asset_generate_preview()
+        game_profile_impl.end_process_material(new_mat)
 
         material_lib_path = os.path.join(asset_library_dir, material_path_local_no_ext) + '.blend'
         os.makedirs(os.path.dirname(material_lib_path), exist_ok=True)
@@ -413,6 +312,7 @@ class AssetImporter:
                                  asset_library_dir: str,
                                  asset_path: str,
                                  umodel_export_dir: str,
+                                 game_profile: str,
                                  db: t.Optional[asset_db.AssetDB] = None
                                  ) -> None:
         """Import asset (mesh) to an assset library from UModel output.
@@ -421,11 +321,13 @@ class AssetImporter:
         :param asset_library_dir: Directory to store the asset, and its dependencies in.
         :param asset_path: Path to the asset in game format.
         :param umodel_export_dir: UModel output directory to source .psk files from.
+        :param game_profile: Game profile to import.
         :param db: Asset database to operate on. If given, no saving is performed, else the function handles
         everything by itself.
         :raises OSError: Raised when an asset was not found in the UModel output dir or the failed opening.
         :raises FileNotFounderror: Raised when an asset was not found in the directory.
         :raises RuntimeError: Raised when an asset failed importing due to unknown .psk/.pskx importer issue.
+        :raises NotImplementedError: Raised when requested game profile is not implemented or available.
         """
 
         has_external_db = db is not None
@@ -482,10 +384,11 @@ class AssetImporter:
 
         # - read material descriptor file and identify associated materials
         try:
-            mat_descriptors_paths = props_txt_parser.parse_props_txt(asset_psk_path_noext + '.props.txt', mode='MESH')
+            _, mat_descriptors_paths = props_txt_parser.parse_props_txt(asset_psk_path_noext + '.props.txt',
+                                                                        mode='MESH')
         except OSError:
             self._op_message('WARNING', f"Loading material descriptor {asset_psk_path_noext + '.props.txt'} failed. "
-                             "Materials might not be avaialble for the imported object.")
+                             "Materials will not be avaialble for the imported object.")
         else:
             # attempt to obtain materials manually if descriptor is not available
             mat_desc_order_map = {mat.name: None for mat in obj.data.materials}
@@ -515,7 +418,7 @@ class AssetImporter:
                         for mat in old_materials:
                             try:
                                 bpy.data.materials.remove(mat, do_unlink=True)
-                            except ReferenceError:
+                            except ReferenceError:  # TODO: figure out why?
                                 pass
 
                         bpy.data.objects.remove(obj, do_unlink=True)
@@ -551,7 +454,8 @@ class AssetImporter:
                                                          material_path_local=material_path_local,
                                                          db=db,
                                                          umodel_export_dir=umodel_export_dir,
-                                                         asset_library_dir=asset_library_dir)
+                                                         asset_library_dir=asset_library_dir,
+                                                         game_profile=game_profile)
 
                     # load material from the library
                     with bpy.data.libraries.load(filepath=material_lib_path, link=True) as (data_from, data_to):
@@ -564,12 +468,13 @@ class AssetImporter:
                     new_mat = bpy.data.materials.new(f"{material_name}_Placeholder")
                     self._op_message('WARNING',
                                      f"Material \"{material_name}\" failed to load, placeholder used instead.")
+                    traceback.print_exc()
 
-                new_materials.append(new_mat)
+                new_materials.append((new_mat, material_name))
 
-            for i, mat in enumerate(new_materials):
-                if len(obj.data.materials) > i:
-                    obj.data.materials[i] = mat
+            for mat, mat_name in new_materials:
+                if mat_name in obj.data.materials:
+                    obj.data.materials[obj.data.materials.find(mat_name)] = mat
                 else:
                     obj.data.materials.append(mat)
 
@@ -577,7 +482,7 @@ class AssetImporter:
             for mat in old_materials:
                 try:
                     bpy.data.materials.remove(mat, do_unlink=True)
-                except ReferenceError:
+                except ReferenceError:  # TODO: figure out why?
                     pass
 
         # obj.asset_generate_preview()
@@ -591,7 +496,7 @@ class AssetImporter:
         bpy.data.objects.remove(obj, do_unlink=True)
         bpy.data.meshes.remove(mesh, do_unlink=True)
 
-        for mat in new_materials:
+        for mat, _ in new_materials:
             try:
                 bpy.data.materials.remove(mat, do_unlink=True)
             except ReferenceError:

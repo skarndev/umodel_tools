@@ -22,9 +22,6 @@ import traceback
 
 import bpy
 
-import faulthandler
-
-faulthandler.enable()
 
 # include custom lib vendoring dir
 parent_dir = os.path.abspath(os.path.dirname(__file__))
@@ -34,15 +31,18 @@ sys.path.append(vendor_dir)
 
 from . import auto_load  # nopep8
 
+
+#: Addon description for Blender. Displayed in settings.
 bl_info = {
     "name": "UModel Tools",
     "author": "Skarn",
     "version": (1, 0),
     "blender": (3, 40, 0),
-    "description": "Reverse engineer Unreal Engine scenes in Blender.",
+    "description": "Import Unreal Engine games scenes and assets into Blender.",
     "category": "Import-Export"
 }
 
+#: Name of the addon recognizeable by Blender
 PACKAGE_NAME = __package__
 
 
@@ -60,6 +60,14 @@ def unregister():
         auto_load.unregister()
     except Exception:
         traceback.print_exc()
+
+
+__all__ = (
+    'bl_info',
+    'register',
+    'unregister',
+    'PACKAGE_NAME'
+)
 
 
 if __name__ == "__main__":

@@ -9,20 +9,20 @@ with open(os.path.join(os.path.dirname(__file__), 'props_txt_grammar.lark')) as 
 
 
 @t.overload
-def parse_props_txt(props_txt_path: str, mode: t.Literal['MESH']) -> list[str]:
+def parse_props_txt(props_txt_path: str, mode: t.Literal['MESH']) -> tuple[lark.Tree, list[str]]:
     ...
 
 
 @t.overload
 def parse_props_txt(props_txt_path: str,
                     mode: t.Literal['MATERIAL']
-                    ) -> tuple[dict[str, str], dict[str, str | float | bool]]:
+                    ) -> tuple[lark.Tree, dict[str, str], dict[str, str | float | bool]]:
     ...
 
 
 def parse_props_txt(props_txt_path: str,
                     mode: t.Literal['MESH'] | t.Literal['MATERIAL']
-                    ) -> list[str] | list[tuple[str, str]]:
+                    ) -> tuple[lark.Tree, list[str]] | tuple[lark.Tree, dict[str, str], dict[str, str | float | bool]]:
     """Parses props.txt file (UModel output) and returns either a list of material paths, or a list of texture paths
     depending on the mode. Note, the mode should be used appropriately depending on the origin of the file.
 
@@ -67,7 +67,7 @@ def parse_props_txt(props_txt_path: str,
                         _, path_value = path_desc.children
                         material_paths.append(path_value.children[0].value[1:][:-1])
 
-                return material_paths
+                return ast, material_paths
 
             case 'MATERIAL':
                 texture_infos = {}
@@ -119,7 +119,7 @@ def parse_props_txt(props_txt_path: str,
 
                                 base_prop_overrides[prop_name] = prop_value
 
-                return texture_infos, base_prop_overrides
+                return ast, texture_infos, base_prop_overrides
 
             case _:
                 raise NotImplementedError()
