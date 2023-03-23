@@ -1,5 +1,7 @@
 import bpy
 
+from .preferences import get_addon_preferences
+
 
 class UMODELTOOLS_PT_asset(bpy.types.Panel):
     bl_region_type = 'WINDOW'
@@ -36,9 +38,24 @@ class UMODELTOOLS_PG_asset(bpy.types.PropertyGroup):
     )
 
 
+def topbar_menu_func(menu: bpy.types.Menu, context: bpy.types.Context):
+    if context.region.alignment != 'RIGHT':
+        return
+
+    prefs = get_addon_preferences()
+
+    if not prefs.display_cur_profile:
+        return
+
+    cur_profile = prefs.get_active_profile()
+    menu.layout.label(text=f"UMT Active profile: {cur_profile.name if cur_profile else None}")
+
+
 def bl_register() -> None:
     bpy.types.Object.umodel_tools_asset = bpy.props.PointerProperty(type=UMODELTOOLS_PG_asset)
+    bpy.types.TOPBAR_HT_upper_bar.append(topbar_menu_func)
 
 
 def bl_unregister() -> None:
     del bpy.types.Object.umodel_tools_asset
+    bpy.types.TOPBAR_HT_upper_bar.remove(topbar_menu_func)

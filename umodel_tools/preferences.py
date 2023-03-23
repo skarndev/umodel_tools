@@ -120,6 +120,12 @@ class UMODELTOOLS_AP_addon_preferences(bpy.types.AddonPreferences):
         default=0
     )
 
+    display_cur_profile: bpy.props.BoolProperty(
+        name="Display current profile",
+        description="Display current profile on top of Blender's window",
+        default=True
+    )
+
     def get_active_profile(self) -> t.Optional[UMODELTOOLS_PG_game_profile]:
         try:
             return self.profiles[self.active_profile_index]
@@ -128,6 +134,7 @@ class UMODELTOOLS_AP_addon_preferences(bpy.types.AddonPreferences):
 
     def draw(self, context: bpy.types.Context):
         layout = self.layout
+        layout.prop(self, "display_cur_profile")
         layout.label(text="Game profiles:")
         row = layout.row()
         row.template_list("UMODELTOOLS_UL_game_profiles", "", self, "profiles", self, "active_profile_index")
