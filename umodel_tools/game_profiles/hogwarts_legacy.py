@@ -4,7 +4,6 @@ Known issues:
 """
 
 import enum
-import typing as t
 
 import bpy
 import lark
@@ -66,9 +65,19 @@ TEXTURE_PARAM_NAME_TRS = {
     "MRO/SRO A Map": TextureMapTypes.MRO,
     "MRO A Map": TextureMapTypes.MROH,
 
+    # Weird stuff goes here
     "Color Glass": TextureMapTypes.Diffuse,
     "Base color": TextureMapTypes.Diffuse,
-    "MROA": TextureMapTypes.MRO  # TODO: A stands for what?
+    "Base Color": TextureMapTypes.Diffuse,
+    "MROA": TextureMapTypes.MRO,  # TODO: A stands for what?,
+    "Color Mask": TextureMapTypes.Diffuse,
+    "Worn Diffuse": TextureMapTypes.Diffuse,
+    "Worn Normal": TextureMapTypes.Normal,
+    "Worn SRO": TextureMapTypes.SRO,
+    "Worn MRO": TextureMapTypes.MRO,
+    "Worn MROH": TextureMapTypes.MROH,
+    "Worn MROH/SROH": TextureMapTypes.MROH,
+    "Worn MRO/SRO": TextureMapTypes.MRO,
 }
 
 _state_buffer: dict[bpy.types.Material, tuple[bpy.types.ShaderNodeBsdfPrincipled | bpy.types.ShaderNodeBsdfDiffuse,

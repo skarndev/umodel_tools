@@ -51,14 +51,14 @@ def register():
 
     try:
         auto_load.register()
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         traceback.print_exc()
 
 
 def unregister():
     try:
         auto_load.unregister()
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         traceback.print_exc()
 
 

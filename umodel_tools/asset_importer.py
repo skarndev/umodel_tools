@@ -3,7 +3,7 @@ import os
 import traceback
 import shutil
 
-from io_import_scene_unreal_psa_psk_280 import pskimport
+from io_import_scene_unreal_psa_psk_280 import pskimport  # pylint: disable=import-error
 import bpy
 
 from . import enums
@@ -44,16 +44,16 @@ class AssetImporter:
 
     _unrecognized_texture_types: set[str] = set()
 
-    def _op_message(self, type: t.Literal['INFO'] | t.Literal['ERROR'] | t.Literal['WARNING'], msg: str):
+    def _op_message(self, msg_type: t.Literal['INFO'] | t.Literal['ERROR'] | t.Literal['WARNING'], msg: str):
         """Print operator message and return the associated status-code.
 
-        :param type: Type of message.
+        :param msg_type: Type of message.
         :param msg: Message text.
         :raises NotImplementedError: Raise when an incorrect ``type`` is passed.
         :return: Blender operator error code.
         """
-        self.report(type={type, }, message=msg)
-        match type:
+        self.report(type={msg_type, }, message=msg)  # pylint: disable=no-member
+        match msg_type:
             case 'INFO':
                 return {'FINISHED'}
             case 'ERROR':

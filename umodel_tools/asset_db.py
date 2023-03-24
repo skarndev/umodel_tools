@@ -31,18 +31,18 @@ class AssetDB:
         # create DB if not found
         if not os.path.exists(self._db_cats_path):
             os.makedirs(db_root_path, exist_ok=True)
-            with open(self._db_cats_path, 'w') as f:
+            with open(self._db_cats_path, mode='w', encoding='utf-8') as f:
                 f.writelines(f'VERSION {self._version}')
 
         # read DB from disk
         else:
-            with open(self._db_cats_path, 'r') as f:
+            with open(self._db_cats_path, mode='r', encoding='utf-8') as f:
                 for line in f.readlines():
                     # skip empty lines and comments
                     if not line or line.startswith('#') or line == '\n':
                         continue
 
-                    elif len(components := line.split(':')) == 3:
+                    if len(components := line.split(':')) == 3:
                         uid, full_path, simple_path = components
                         self._catalogs[uid] = full_path, simple_path
                     elif len(components := line.split(' ')) == 2 and components[0] == 'VERSION':
@@ -50,24 +50,24 @@ class AssetDB:
                     else:
                         raise NotImplementedError()
 
-    def uid_for_entry(self, dir: str) -> str:
+    def uid_for_entry(self, dir_path: str) -> str:
         """Return an asset catalogue ID for the given path, create one if it does not yet exist.
 
-        :param dir: Directory relative to ``db_root_path``.
+        :param dir_path: Directory relative to ``db_root_path``.
         :return: RFC_4122 UUID string.
         """
-        dir = dir.replace('\\', '/')
+        dir_path = dir_path.replace('\\', '/')
 
         # search already existing UID
         for uid, (full_path, _) in self._catalogs.items():
-            if full_path == dir:
+            if full_path == dir_path:
                 return uid
 
         # generate new entry
         uid = uuid.uuid1()
         assert uid.variant == uuid.RFC_4122
 
-        self._catalogs[str(uid)] = dir, dir.replace('/', '-')
+        self._catalogs[str(uid)] = dir_path, dir_path.replace('/', '-')
 
         return str(uid)
 
@@ -77,7 +77,7 @@ class AssetDB:
         if not os.path.exists(self._db_cats_path):
             os.makedirs(os.path.dirname(self._db_cats_path), exist_ok=True)
 
-        with open(self._db_cats_path, 'w') as f:
+        with open(self._db_cats_path, mode='w', encoding='utf-8') as f:
             f.write(f"VERSION {self._version}\n")
 
             for uid, (full_path, simple_path) in self._catalogs.items():
