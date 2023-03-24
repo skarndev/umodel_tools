@@ -84,7 +84,7 @@ _state_buffer: dict[bpy.types.Material, tuple[bpy.types.ShaderNodeBsdfPrincipled
                                               bool]] = {}
 
 
-def process_material(mat: bpy.types.Material, _: lark.Tree, use_pbr: bool):
+def process_material(mat: bpy.types.Material, desc_ast: lark.Tree, use_pbr: bool):  # pylint: disable=unused-argument
     _state_buffer[mat] = None, use_pbr
 
 
