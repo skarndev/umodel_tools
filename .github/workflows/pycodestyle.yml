@@ -1,0 +1,28 @@
+name: pycodestyle
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+
+jobs:
+  pycodestyle:
+    name: Run pycodestyle
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install pycodestyle
+      run: |
+        sudo apt update
+        sudo apt install pycodestyle -y
+    - name: Run pycodestyle
+      run: |
+        pycodestyle --statistics
+   
