@@ -9,6 +9,10 @@ import bpy
 import lark
 
 
+GAME_NAME = "Hogwarts Legacy"
+GAME_DESCRIPTION = "Hogwarts Legacy (2023) by Portkey Games"
+
+
 class TextureMapTypes(enum.Enum):
     """All texture map types supported by the material generator.
     """

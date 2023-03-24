@@ -24,6 +24,12 @@ class GameHandler(t.Protocol):
     """Modules adding support for specific games must implement this protocol.
     """
 
+    # Name of the game
+    GAME_NAME: str
+
+    # Description of the game
+    GAME_DESCRIPTION: str
+
     def process_material(mat: bpy.types.Material, desc_ast: lark.Tree, use_pbr: bool) -> None:
         """Does all sorts of unspecified processing on the material prior to texture imports.
 
@@ -84,10 +90,8 @@ class GameHandler(t.Protocol):
         """
 
 
-#: List of all game profiles supported by the addon.
-SUPPORTED_GAMES: list[tuple[str, str, str, int]] = [
-    ('hogwarts_legacy', "Hogwarts Legacy", "Hogwarts Legacy (2023) by Portkey Games", 0),
-]
+#: List of all game profiles supported by the addon (used for Blender UI EnumProperties).
+SUPPORTED_GAMES: list[tuple[str, str, str, int]] = []
 
 
 #: List of all implemented game handlers (populated automatically).
@@ -98,12 +102,6 @@ for element in os.listdir(profile_path := os.path.dirname(__file__)):
         continue
 
     impl_name = os.path.splitext(element)[0]
-    found, impl_index = next(((True, i) for i, x in enumerate(SUPPORTED_GAMES) if x[0] == impl_name), (None, -1))
-
-    if found is None:
-        print(f"Game handler \"{impl_name}.py\" was found, but is not listed among the supported games. "
-              "Forgot to add it to the config?")
-        continue
 
     try:
         game_profile = importlib.import_module(f'.{impl_name}', package='umodel_tools.game_profiles')
@@ -113,9 +111,10 @@ for element in os.listdir(profile_path := os.path.dirname(__file__)):
             continue
 
         GAME_HANDLERS[impl_name] = game_profile
+        SUPPORTED_GAMES.append((impl_name, game_profile.GAME_NAME, game_profile.GAME_DESCRIPTION, len(SUPPORTED_GAMES)))
 
     except ImportError:
-        print(f"Error: handler \"{impl_name}.py\" for the game \"{SUPPORTED_GAMES[impl_index][1]}\" failed importing.")
+        print(f"Error: handler \"{impl_name}.py\" failed importing.")
         traceback.print_exc()
 
 
