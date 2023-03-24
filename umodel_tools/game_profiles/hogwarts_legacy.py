@@ -4,6 +4,8 @@ Known issues:
 """
 
 import enum
+import typing as t
+import dataclasses
 
 import bpy
 import lark
@@ -21,6 +23,7 @@ class TextureMapTypes(enum.Enum):
     SRO = enum.auto()
     MROH = enum.auto()
     MRO = enum.auto()
+    MSK = enum.auto()
 
 
 #: Translates names retrieved from .props.txt into sensible texture map types
@@ -70,7 +73,7 @@ TEXTURE_PARAM_NAME_TRS = {
     "Base color": TextureMapTypes.Diffuse,
     "Base Color": TextureMapTypes.Diffuse,
     "MROA": TextureMapTypes.MRO,  # TODO: A stands for what?,
-    "Color Mask": TextureMapTypes.Diffuse,
+    "Color Mask": TextureMapTypes.MSK,
     "Worn Diffuse": TextureMapTypes.Diffuse,
     "Worn Normal": TextureMapTypes.Normal,
     "Worn SRO": TextureMapTypes.SRO,
@@ -80,12 +83,20 @@ TEXTURE_PARAM_NAME_TRS = {
     "Worn MRO/SRO": TextureMapTypes.MRO,
 }
 
-_state_buffer: dict[bpy.types.Material, tuple[bpy.types.ShaderNodeBsdfPrincipled | bpy.types.ShaderNodeBsdfDiffuse,
-                                              bool]] = {}
+
+@dataclasses.dataclass
+class MaterialContext:
+    bsdf_node: t.Optional[bpy.types.ShaderNodeBsdfPrincipled | bpy.types.ShaderNodeBsdfDiffuse]
+    desc_ast: lark.Tree
+    use_pbr: bool
+    msk_index: int = dataclasses.field(default=0)
+
+
+_state_buffer: dict[bpy.types.Material, MaterialContext] = {}
 
 
 def process_material(mat: bpy.types.Material, desc_ast: lark.Tree, use_pbr: bool):  # pylint: disable=unused-argument
-    _state_buffer[mat] = None, use_pbr
+    _state_buffer[mat] = MaterialContext(bsdf_node=None, desc_ast=desc_ast, use_pbr=use_pbr)
 
 
 def do_process_texture(tex_type: str) -> bool:
@@ -93,7 +104,7 @@ def do_process_texture(tex_type: str) -> bool:
 
 
 def is_diffuse_tex_type(tex_type: str) -> bool:
-    return TEXTURE_PARAM_NAME_TRS.get(tex_type) == TextureMapTypes.Diffuse
+    return TEXTURE_PARAM_NAME_TRS.get(tex_type) in {TextureMapTypes.Diffuse, TextureMapTypes.MSK}
 
 
 def handle_material_texture_pbr(mat: bpy.types.Material,
@@ -104,8 +115,8 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
                                 out_node: bpy.types.ShaderNodeOutputMaterial):
     # Note: we presume MROH and SRO are mutually exclusive and never appear together.
     # This is not validated.
-    _, use_pbr = _state_buffer[mat]
-    _state_buffer[mat] = bsdf_node, use_pbr
+    mat_ctx = _state_buffer[mat]
+    mat_ctx.bsdf_node = bsdf_node
 
     bl_tex_type = TEXTURE_PARAM_NAME_TRS.get(tex_type)
     assert bl_tex_type is not None
@@ -149,13 +160,53 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
             mat.node_tree.links.new(mro_split.outputs['Blue'], ao_mix_node.inputs[7])
             mat.node_tree.links.new(img_node.outputs['Color'], mro_split.inputs['Color'])
 
+        case TextureMapTypes.MSK:
+            mat_ctx = _state_buffer[mat]
+            mask_colors = _get_mask_colors(ast=mat_ctx.desc_ast)
+
+            color1 = mask_colors.get(f'color {mat_ctx.msk_index + 1}')
+            color2 = mask_colors.get(f'color {mat_ctx.msk_index + 2}')
+            color3 = mask_colors.get(f'color {mat_ctx.msk_index + 3}')
+
+            msk_split = mat.node_tree.nodes.new('ShaderNodeSeparateColor')
+
+            b_mix = mat.node_tree.nodes.new('ShaderNodeMix')
+            b_mix.data_type = 'RGBA'
+            b_mix.blend_type = 'MIX'
+            b_mix.inputs[6].default_value = color1 if color1 is not None else (0, 0, 1, 1)
+            b_mix.inputs[7].default_value = (0, 0, 0, 1)
+
+            g_mix = mat.node_tree.nodes.new('ShaderNodeMix')
+            g_mix.data_type = 'RGBA'
+            g_mix.blend_type = 'MIX'
+            g_mix.inputs[7].default_value = color2 if color2 is not None else (0, 1, 0, 1)
+
+            r_mix = mat.node_tree.nodes.new('ShaderNodeMix')
+            r_mix.data_type = 'RGBA'
+            r_mix.blend_type = 'MIX'
+            r_mix.inputs[7].default_value = color3 if color3 is not None else (1, 0, 0, 1)
+
+            mat.node_tree.links.new(img_node.outputs['Color'], msk_split.inputs['Color'])
+            mat.node_tree.links.new(msk_split.outputs['Red'], r_mix.inputs[0])
+            mat.node_tree.links.new(msk_split.outputs['Green'], g_mix.inputs[0])
+            mat.node_tree.links.new(msk_split.outputs['Blue'], b_mix.inputs[0])
+
+            # connect mix nodes
+            mat.node_tree.links.new(b_mix.outputs[2], g_mix.inputs[6])
+            mat.node_tree.links.new(g_mix.outputs[2], r_mix.inputs[6])
+            mat.node_tree.links.new(r_mix.outputs[2], ao_mix_node.inputs[6])
+            mat.node_tree.links.new(img_node.outputs['Alpha'], bsdf_node.inputs['Alpha'])
+            img_node.select = True
+            mat.node_tree.nodes.active = img_node
+
+            mat_ctx.msk_index += 1
+
 
 def handle_material_texture_simple(mat: bpy.types.Material,
                                    _: str,
                                    img_node: bpy.types.ShaderNodeTexImage,
                                    bsdf_node: bpy.types.ShaderNodeBsdfDiffuse):
-    _, use_pbr = _state_buffer[mat]
-    _state_buffer[mat] = bsdf_node, use_pbr
+    _state_buffer[mat].bsdf_node = bsdf_node
 
     mat.node_tree.links.new(img_node.outputs['Color'], bsdf_node.inputs['Color'])
     img_node.select = True
@@ -163,14 +214,74 @@ def handle_material_texture_simple(mat: bpy.types.Material,
 
 
 def end_process_material(mat: bpy.types.Material):
-    bsdf, use_pbr = _state_buffer[mat]
+    mat_ctx = _state_buffer[mat]
 
-    if use_pbr and bsdf is not None:
+    if mat_ctx.use_pbr and mat_ctx.bsdf_node is not None:
         # set defaults
-        bsdf.inputs[4].default_value = 1.01  # Subsurface IOR
-        bsdf.inputs[7].default_value = 0.0  # Specular
-        bsdf.inputs[9].default_value = 0.0  # Roughness
-        bsdf.inputs[13].default_value = 0.0  # Sheen Tint
-        bsdf.inputs[15].default_value = 0.0  # Clearcoat roughness
+        mat_ctx.bsdf_node.inputs[4].default_value = 1.01  # Subsurface IOR
+        mat_ctx.bsdf_node.inputs[7].default_value = 0.0  # Specular
+        mat_ctx.bsdf_node.inputs[9].default_value = 0.0  # Roughness
+        mat_ctx.bsdf_node.inputs[13].default_value = 0.0  # Sheen Tint
+        mat_ctx.bsdf_node.inputs[15].default_value = 0.0  # Clearcoat roughness
 
     del _state_buffer[mat]
+
+# Non-interface functions below
+
+
+Color: t.TypeAlias = tuple[float, float, float]
+
+
+def _get_mask_colors(ast: lark.Tree) -> dict[str, Color]:
+    """Get MSK colors from texture parameters.
+
+    :param ast: .props.txt AST
+    :return: dictionary mapping color names to values.
+    """
+
+    colors = {}
+
+    for child in ast.children:
+        assert child.data == 'definition'
+        def_name, array_qual, value = child.children
+
+        match def_name:
+            case 'VectorParameterValues':
+                assert array_qual is not None
+                assert value.data == 'structured_block'
+
+                for tex_param_def in value.children:
+                    _, _, tex_param = tex_param_def.children
+                    param_info, param_val, _ = tex_param.children  # ParameterInfo, ParameterValue, ParameterName
+                    _, _, color_vec = param_val.children
+
+                    color_name = param_info.children[2].children[0].children[2].children[0].value.strip()
+
+                    # ignore unused materials
+                    if color_vec.data != 'structured_block':
+                        continue
+
+                    color = {
+                        'r': 0.0,
+                        'g': 0.0,
+                        'b': 0.0,
+                        'a': 1.0
+                    }
+
+                    not_a_color = False
+                    for channel_def in color_vec.children:
+                        channel_name, _, channel = channel_def.children
+                        channel_name = channel_name.lower()
+
+                        if channel_name not in {'r', 'g', 'b', 'a'}:
+                            not_a_color = True
+                            continue
+
+                        color[channel_name] = float(channel.children[0].value)
+
+                    if not_a_color:
+                        continue
+
+                    colors[color_name.lower()] = (color['r'], color['g'], color['b'], color['a'])
+
+    return colors

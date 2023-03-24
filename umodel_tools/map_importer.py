@@ -166,7 +166,7 @@ class StaticMesh:
                              collection: bpy.types.Collection) -> list[bpy.types.Object]:
         if self.invalid:
             print(f'Refusing to import {self.entity_name} due to failed checks.')
-            return None
+            return []
 
         objects = []
         trs = self.transform
@@ -326,6 +326,9 @@ class MapImporter(asset_importer.AssetImporter):
                         continue
 
                     obj_instances = static_mesh.link_object_instance(obj, import_collection)
-                    bpy.app.timers.register(ft.partial(self._library_reload_mesh, obj_instances), first_interval=0.01)
+
+                    if obj_instances:
+                        bpy.app.timers.register(ft.partial(self._library_reload_mesh, obj_instances),
+                                                first_interval=0.01)
 
         return True
