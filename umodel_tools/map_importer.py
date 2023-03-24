@@ -148,7 +148,7 @@ class StaticMesh:
 
                         if (rot := trs_data.get("Rotation", None)) is not None:
                             rot_quat = mu.Quaternion((rot.get("W"), rot.get("X"), rot.get("Y"), rot.get("Z")))
-                            quat_to_euler: mu.Euler = rot_quat.to_euler()
+                            quat_to_euler: mu.Euler = rot_quat.to_euler()  # pylint: disable=no-value-for-parameter
                             trs.rot_euler = (-quat_to_euler.x, quat_to_euler.y, -quat_to_euler.z)
 
                         if (scale := trs_data.get("Scale3D", None)) is not None:
@@ -292,7 +292,7 @@ class MapImporter(asset_importer.AssetImporter):
 
         bpy.context.scene.collection.children.link(import_collection)
 
-        with open(map_path) as file:
+        with open(map_path, mode='r', encoding='utf-8') as file:
             json_object = json.load(file)
 
             # Handle the different entity types

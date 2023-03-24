@@ -159,6 +159,7 @@ class AssetImporter:
         material_path_local_no_ext = os.path.splitext(os.path.splitext(material_path_local)[0])[0]  # remove .props.txt
 
         # load texture infos, may throw OSError if file is not found.
+        # pylint: disable=unpacking-non-sequence
         desc_ast, texture_infos, base_prop_overrides = props_txt_parser.parse_props_txt(os.path.join(umodel_export_dir,
                                                                                         material_path_local),
                                                                                         mode='MATERIAL')
@@ -384,6 +385,7 @@ class AssetImporter:
 
         # - read material descriptor file and identify associated materials
         try:
+            # pylint: disable=unpacking-non-sequence
             _, mat_descriptors_paths = props_txt_parser.parse_props_txt(asset_psk_path_noext + '.props.txt',
                                                                         mode='MESH')
         except OSError:
@@ -414,16 +416,18 @@ class AssetImporter:
                         self._op_message('ERROR', "Material count mismatch.")
                         mesh = obj.data
 
+                        bpy.data.objects.remove(obj, do_unlink=True)
+                        bpy.data.meshes.remove(mesh, do_unlink=True)
+                        bpy.data.scenes.remove(temp_scene, do_unlink=True)
+
+                        old_materials = [mat for mat in mesh.materials]
+
                         # perform cleanup before raising
                         for mat in old_materials:
                             try:
                                 bpy.data.materials.remove(mat, do_unlink=True)
                             except ReferenceError:  # TODO: figure out why?
                                 pass
-
-                        bpy.data.objects.remove(obj, do_unlink=True)
-                        bpy.data.meshes.remove(mesh, do_unlink=True)
-                        bpy.data.scenes.remove(temp_scene, do_unlink=True)
 
                         raise FileNotFoundError()
 

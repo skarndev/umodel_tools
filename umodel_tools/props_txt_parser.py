@@ -4,8 +4,9 @@ import typing as t
 
 import lark
 
-with open(os.path.join(os.path.dirname(__file__), 'props_txt_grammar.lark')) as f:
-    lark_parser = lark.Lark(f, parser='earley', propagate_positions=True, ambiguity='resolve')
+
+with open(os.path.join(os.path.dirname(__file__), 'props_txt_grammar.lark'), mode='r', encoding='utf-8') as grammar_f:
+    lark_parser = lark.Lark(grammar_f, parser='earley', propagate_positions=True, ambiguity='resolve')
 
 
 @t.overload
@@ -34,7 +35,7 @@ def parse_props_txt(props_txt_path: str,
     :return: A list of relative paths (game format paths).
     """
     print(f"Parsing {props_txt_path}...")
-    with open(props_txt_path, 'r') as f:
+    with open(props_txt_path, mode='r', encoding='utf-8') as f:
         text = f.read()
 
         try:

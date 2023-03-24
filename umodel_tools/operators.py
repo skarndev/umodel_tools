@@ -1,18 +1,19 @@
-import typing as t
+
 import os
-import numpy as np
-import mathutils as mu
 import contextlib
 import sys
-import pexpect
-import pexpect.popen_spawn
 import signal
 import time
+import typing as t
 
+import numpy as np
+import pexpect
+import pexpect.popen_spawn
 import tqdm
 import tqdm.contrib
 import bpy
 import bpy_extras.io_utils
+import mathutils as mu
 
 from . import utils
 from . import asset_importer
@@ -51,7 +52,7 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
         description="Path to an alleged asset within the game"
     )
 
-    def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[int] | set[str]:
+    def invoke(self, context: bpy.types.Context, _: bpy.types.Event) -> set[int] | set[str]:
         wm: bpy.types.WindowManager = context.window_manager
 
         return wm.invoke_props_dialog(self)

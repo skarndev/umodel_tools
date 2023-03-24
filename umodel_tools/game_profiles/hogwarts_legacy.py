@@ -35,13 +35,11 @@ TEXTURE_PARAM_NAME_TRS = {
     "SRO Map": TextureMapTypes.SRO,
     "MROH Map": TextureMapTypes.MROH,
     "MROH/SROH Map": TextureMapTypes.MROH,
-    "MRO/SRO Map": TextureMapTypes.MRO,
     "MRO Map": TextureMapTypes.MRO,
 
     "Diffuse A": TextureMapTypes.Diffuse,
     "Normal A": TextureMapTypes.Normal,
     "SRO A": TextureMapTypes.SRO,
-    "MRO/SRO A": TextureMapTypes.SRO,
     "MROH A": TextureMapTypes.MROH,
     "MROH/SROH A": TextureMapTypes.MROH,
     "MRO/SRO A": TextureMapTypes.MRO,
@@ -50,7 +48,6 @@ TEXTURE_PARAM_NAME_TRS = {
     "Diffuse Map A": TextureMapTypes.Diffuse,
     "Normal Map A": TextureMapTypes.Normal,
     "SRO Map A": TextureMapTypes.SRO,
-    "MRO/SRO Map A": TextureMapTypes.SRO,
     "MROH Map A": TextureMapTypes.MROH,
     "MROH/SROH Map A": TextureMapTypes.MROH,
     "MRO/SRO Map A": TextureMapTypes.MRO,
@@ -62,7 +59,6 @@ TEXTURE_PARAM_NAME_TRS = {
     "MRO/SRO A Map": TextureMapTypes.SRO,
     "MROH A Map": TextureMapTypes.MROH,
     "MROH/SROH A Map": TextureMapTypes.MROH,
-    "MRO/SRO A Map": TextureMapTypes.MRO,
     "MRO A Map": TextureMapTypes.MROH,
 
     # Weird stuff goes here
@@ -84,7 +80,7 @@ _state_buffer: dict[bpy.types.Material, tuple[bpy.types.ShaderNodeBsdfPrincipled
                                               bool]] = {}
 
 
-def process_material(mat: bpy.types.Material, desc_ast: lark.Tree, use_pbr: bool):
+def process_material(mat: bpy.types.Material, _: lark.Tree, use_pbr: bool):
     _state_buffer[mat] = None, use_pbr
 
 

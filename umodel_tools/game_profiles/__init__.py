@@ -7,6 +7,9 @@
    The format is: ``('module_name', "Game Name for UI", "Game description for UI", number)``
    The module must implement the ``GameHandler`` protocol.
 """
+
+# pylint: disable=no-self-argument
+
 import os
 import importlib
 import traceback
@@ -29,7 +32,6 @@ class GameHandler(t.Protocol):
         any additional information required to implement game specifics.
         :use_pbr: True if material is imported in a PBR mode.
         """
-        ...
 
     def do_process_texture(tex_type: str) -> bool:
         """Determines whether to process the texture or not.
@@ -37,7 +39,6 @@ class GameHandler(t.Protocol):
         :param tex_type: Texture type string retrieved from .props.txt.
         :return: True if should process, False if should discard.
         """
-        ...
 
     def is_diffuse_tex_type(tex_type: str) -> bool:
         """Identifies if the texture is a diffuse color map.
@@ -46,7 +47,6 @@ class GameHandler(t.Protocol):
         :param tex_type: Texture type string retrieved from .props.txt.
         :return: True if texture is a diffuse map, else False.
         """
-        ...
 
     def handle_material_texture_pbr(mat: bpy.types.Material,
                                     tex_type: str,
@@ -63,7 +63,6 @@ class GameHandler(t.Protocol):
         :param bsdf_node: PrincipledBSDF node in the material's node tree.
         :param out_node: Material output node in the material's node tree.
         """
-        ...
 
     def handle_material_texture_simple(mat: bpy.types.Material,
                                        tex_type: str,
@@ -77,14 +76,12 @@ class GameHandler(t.Protocol):
         :param img_node: Image node in the material's node tree.
         :param bsdf_node: DiffuseBSDF node in the material's node tree.
         """
-        ...
 
     def end_process_material(mat: bpy.types.Material) -> None:
         """Called at the end of the material processing, can be used to cleanup state (if any is kept).
 
         :param: mat: Material that was processed.
         """
-        ...
 
 
 #: List of all game profiles supported by the addon.
@@ -96,7 +93,8 @@ SUPPORTED_GAMES: list[tuple[str, str, str, int]] = [
 #: List of all implemented game handlers (populated automatically).
 GAME_HANDLERS: dict[str, GameHandler] = {}
 for element in os.listdir(profile_path := os.path.dirname(__file__)):
-    if not os.path.isfile(os.path.join(profile_path, element)) or not element.endswith('.py') or element == "__init__.py":
+    if (not os.path.isfile(os.path.join(profile_path, element)) or not element.endswith('.py')
+       or element == "__init__.py"):
         continue
 
     impl_name = os.path.splitext(element)[0]

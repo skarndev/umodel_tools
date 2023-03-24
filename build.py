@@ -75,7 +75,7 @@ def build_project(no_req: bool, dist_path: t.Optional[str]):
                     status = subprocess.call([PYTHON_PATH, '-m', 'pip', 'install', line, '-t',
                                              'umodel_tools/third_party', '--upgrade'])
                     if status:
-                        print('\nError: failed installing module \"{}\". See pip error above.'.format(line))
+                        print(f'\nError: failed installing module \"{line}\". See pip error above.')
                         sys.exit(1)
 
         else:

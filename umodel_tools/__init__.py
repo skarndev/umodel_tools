@@ -29,7 +29,7 @@ vendor_dir = os.path.join(parent_dir, 'third_party')
 
 sys.path.append(vendor_dir)
 
-from . import auto_load  # nopep8
+from . import auto_load  # nopep8 pylint: disable=wrong-import-position
 
 
 #: Addon description for Blender. Displayed in settings.

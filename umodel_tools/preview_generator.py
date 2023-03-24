@@ -1,5 +1,4 @@
 import bpy
-import functools
 
 
 def _render_previews_worker(assets: list[bpy.types.ID]):
