@@ -233,6 +233,8 @@ class GameLight:
         # TODO: expand this method with more properties for the specific light types
         # Problem: I don't know how values for UE lights map to Blender's light types.
 
+        return None
+
     def import_light(self, collection) -> bool:
         if self.no_entity:
             print(f"Refusing to import {self.entity_name} due to failed checks.")
@@ -253,6 +255,8 @@ class GameLight:
                                             'XYZ')
         collection.objects.link(light_obj)
         bpy.context.scene.collection.objects.link(light_obj)
+
+        return True
 
 
 class MapImporter(asset_importer.AssetImporter):

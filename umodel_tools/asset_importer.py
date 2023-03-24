@@ -95,10 +95,12 @@ class AssetImporter:
 
             if load:
                 with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
-                    data_to.objects = [obj for obj in data_from.objects]
+                    data_to.objects = list(data_from.objects)
                     assert len(data_to.objects) == 1
 
                 return data_to.objects[0]
+
+            return None
 
         except (RuntimeError, FileNotFoundError):
             traceback.print_exc()
@@ -198,7 +200,7 @@ class AssetImporter:
                                                         f"material \"{material_name}\".")
 
                 if self.import_backface_culling and (two_sided := base_prop_overrides.get('TwoSided')) is not None:
-                    new_mat.use_backface_culling = False if two_sided else True
+                    new_mat.use_backface_culling = not two_sided
 
                 if (alpha_threshold := base_prop_overrides.get('OpacityMaskClipValue')) is not None:
                     new_mat.alpha_threshold = alpha_threshold
@@ -420,7 +422,7 @@ class AssetImporter:
                         bpy.data.meshes.remove(mesh, do_unlink=True)
                         bpy.data.scenes.remove(temp_scene, do_unlink=True)
 
-                        old_materials = [mat for mat in mesh.materials]
+                        old_materials = list(mesh.materials)
 
                         # perform cleanup before raising
                         for mat in old_materials:
@@ -434,7 +436,7 @@ class AssetImporter:
                     mat_descriptors_paths = list(mat_desc_order_map.values())
 
             # replace materials
-            old_materials = [mat for mat in obj.data.materials]
+            old_materials = list(obj.data.materials)
 
             # initialize each material and populate it with data
             for mat_desc_path in mat_descriptors_paths:
