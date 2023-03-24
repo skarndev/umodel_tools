@@ -2,13 +2,9 @@
 import os
 import contextlib
 import sys
-import signal
-import time
 import typing as t
 
 import numpy as np
-import pexpect
-import pexpect.popen_spawn
 import tqdm
 import tqdm.contrib
 import bpy
@@ -235,37 +231,6 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
                         progress_bar.update(1)
 
         db.save_db()
-
-        if self.render_previews:
-            with tqdm.tqdm(total=total_models, file=orig_stdout, dynamic_ncols=True, ascii=True,
-                           desc="Rendering previews") as progress_bar:
-                for root, _, files in os.walk(os.path.join(asset_dir, asset_sub_dir)):
-                    for file in files:
-                        if not file.endswith('.blend'):
-                            continue
-
-                        proc = pexpect.popen_spawn.PopenSpawn(f"\"{bpy.app.binary_path}\" "
-                                                              f"\"{os.path.join(root, file)}\" "
-                                                              "-b --python-console --factory-startup ")
-                        proc.expect_exact('>>>')
-                        time.sleep(0.1)
-                        proc.sendline("import bpy; import umodel_tools.preview_generator as g; g.render_previews()")
-                        proc.expect_exact('>>>')
-
-                        proc.sendline("g.is_finished()")
-                        while not bool(proc.expect_exact(['False', 'True'])):
-                            proc.expect_exact('>>>')
-                            proc.sendline("g.is_finished()")
-
-                        proc.expect_exact('>>>')
-
-                        time.sleep(5)
-
-                        proc.sendline('bpy.ops.wm.save_mainfile(check_existing=False)')
-                        proc.expect_exact('>>>')
-                        proc.kill(signal.SIGTERM)
-
-                        progress_bar.update(1)
 
         print("Unrecognized texture types found:")
         print(self._unrecognized_texture_types)

@@ -53,7 +53,9 @@ class UMODELTOOLS_UL_game_profiles(bpy.types.UIList):
                   game_profile: UMODELTOOLS_PG_game_profile,
                   icon: str,
                   _active_prefs: 'UMODELTOOLS_AP_addon_preferences',
-                  _active_propname: str):
+                  _active_propname: str,
+                  _index: int,
+                  _flt_flag: int):
         layout.prop(game_profile, "name", text="", emboss=False, icon_value=icon)
 
 
