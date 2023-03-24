@@ -11,13 +11,13 @@ on:
       - '.github/**'
 
 jobs:
-  pycodestyle:
+  build:
     name: Run pycodestyle
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Install pycodestyle
       run: |
         sudo apt update
