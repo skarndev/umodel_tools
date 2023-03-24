@@ -52,6 +52,8 @@ def topbar_menu_func(menu: bpy.types.Menu, context: bpy.types.Context):
 
 
 def bl_register() -> None:
+    # pylint: disable=assignment-from-no-return
+
     bpy.types.Object.umodel_tools_asset = bpy.props.PointerProperty(type=UMODELTOOLS_PG_asset)
     bpy.types.TOPBAR_HT_upper_bar.append(topbar_menu_func)
 

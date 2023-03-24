@@ -47,13 +47,13 @@ class UMODELTOOLS_UL_game_profiles(bpy.types.UIList):
     """UIlist for displaying game profiles."""
 
     def draw_item(self,
-                  context: bpy.types.Context,
+                  _context: bpy.types.Context,
                   layout: bpy.types.UILayout,
-                  prefs: 'UMODELTOOLS_AP_addon_preferences',
+                  _prefs: 'UMODELTOOLS_AP_addon_preferences',
                   game_profile: UMODELTOOLS_PG_game_profile,
                   icon: str,
-                  active_prefs: 'UMODELTOOLS_AP_addon_preferences',
-                  active_propname: str):
+                  _active_prefs: 'UMODELTOOLS_AP_addon_preferences',
+                  _active_propname: str):
         layout.prop(game_profile, "name", text="", emboss=False, icon_value=icon)
 
 
@@ -74,12 +74,12 @@ class UMODELTOOLS_OT_actions(bpy.types.Operator):
         )
     )
 
-    def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[str]:
+    def invoke(self, _context: bpy.types.Context, _event: bpy.types.Event) -> set[str]:
         addon_prefs = get_addon_preferences()
         idx = addon_prefs.active_profile_index
 
         try:
-            item = addon_prefs.profiles[idx]
+            addon_prefs.profiles[idx]
         except IndexError:
             pass
         else:
@@ -132,7 +132,7 @@ class UMODELTOOLS_AP_addon_preferences(bpy.types.AddonPreferences):
         except IndexError:
             return None
 
-    def draw(self, context: bpy.types.Context):
+    def draw(self, _context: bpy.types.Context):
         layout = self.layout
         layout.prop(self, "display_cur_profile")
         layout.label(text="Game profiles:")

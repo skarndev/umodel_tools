@@ -24,6 +24,8 @@ ordered_classes = None
 
 
 def init():
+    # pylint: disable=global-statement
+
     global modules
     global ordered_classes
 
@@ -85,13 +87,13 @@ def iter_submodule_names(path, root=""):
 # Find classes to register
 #################################################
 
-def get_ordered_classes_to_register(modules):
-    return toposort(get_register_deps_dict(modules))
+def get_ordered_classes_to_register(py_modules):
+    return toposort(get_register_deps_dict(py_modules))
 
 
-def get_register_deps_dict(modules):
+def get_register_deps_dict(py_modules):
     deps_dict = {}
-    classes_to_register = OrderedSet(iter_classes_to_register(modules))
+    classes_to_register = OrderedSet(iter_classes_to_register(py_modules))
     for cls in classes_to_register:
         deps_dict[cls] = OrderedSet(iter_own_register_deps(cls, classes_to_register))
     return deps_dict
@@ -115,16 +117,16 @@ def get_dependency_from_annotation(value):
     return None
 
 
-def iter_classes_to_register(modules):
+def iter_classes_to_register(py_modules):
     base_types = get_register_base_types()
-    for cls in get_classes_in_modules(modules):
+    for cls in get_classes_in_modules(py_modules):
         if any(base in base_types for base in cls.__bases__):
             yield cls
 
 
-def get_classes_in_modules(modules):
+def get_classes_in_modules(py_modules):
     classes = OrderedSet()
-    for module in modules:
+    for module in py_modules:
         for cls in iter_classes_in_module(module):
             classes.add(cls)
     return classes
