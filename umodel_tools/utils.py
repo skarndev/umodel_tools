@@ -27,12 +27,14 @@ class ContextWrapper:
             return object.__setattr__(self, '_ctx', value)
 
         self._ctx[name] = value
+        return None
 
     def __setattr__(self, name: str, value: t.Any) -> None:
         if name == '_ctx':
             return object.__setattr__(self, '_ctx', value)
 
         self._ctx[name] = value
+        return None
 
 
 def copy_object(obj: bpy.types.Object) -> bpy.types.Object:
