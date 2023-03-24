@@ -24,6 +24,7 @@ class TextureMapTypes(enum.Enum):
     MROH = enum.auto()
     MRO = enum.auto()
     MSK = enum.auto()
+    WEAR_MSK = enum.auto()
 
 
 #: Translates names retrieved from .props.txt into sensible texture map types
@@ -74,6 +75,7 @@ TEXTURE_PARAM_NAME_TRS = {
     "Base Color": TextureMapTypes.Diffuse,
     "MROA": TextureMapTypes.MRO,  # TODO: A stands for what?,
     "Color Mask": TextureMapTypes.MSK,
+    "Wear Mask": TextureMapTypes.WEAR_MSK,
     "Worn Diffuse": TextureMapTypes.Diffuse,
     "Worn Normal": TextureMapTypes.Normal,
     "Worn SRO": TextureMapTypes.SRO,
@@ -90,6 +92,7 @@ class MaterialContext:
     desc_ast: lark.Tree
     use_pbr: bool
     msk_index: int = dataclasses.field(default=0)
+    diffuse_connected: bool = dataclasses.field(default=False)
 
 
 _state_buffer: dict[bpy.types.Material, MaterialContext] = {}
@@ -127,6 +130,8 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
             mat.node_tree.links.new(img_node.outputs['Alpha'], bsdf_node.inputs['Alpha'])
             img_node.select = True
             mat.node_tree.nodes.active = img_node
+            mat_ctx.diffuse_connected = True
+
         case TextureMapTypes.Normal:
             normal_map_node = mat.node_tree.nodes.new('ShaderNodeNormalMap')
             mat.node_tree.links.new(normal_map_node.outputs['Normal'],
@@ -159,6 +164,9 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
             mat.node_tree.links.new(mro_split.outputs['Green'], bsdf_node.inputs['Roughness'])
             mat.node_tree.links.new(mro_split.outputs['Blue'], ao_mix_node.inputs[7])
             mat.node_tree.links.new(img_node.outputs['Color'], mro_split.inputs['Color'])
+
+        case TextureMapTypes.WEAR_MSK:
+            mat_ctx.msk_index += 1
 
         case TextureMapTypes.MSK:
             mat_ctx = _state_buffer[mat]
@@ -194,10 +202,12 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
             # connect mix nodes
             mat.node_tree.links.new(b_mix.outputs[2], g_mix.inputs[6])
             mat.node_tree.links.new(g_mix.outputs[2], r_mix.inputs[6])
-            mat.node_tree.links.new(r_mix.outputs[2], ao_mix_node.inputs[6])
-            mat.node_tree.links.new(img_node.outputs['Alpha'], bsdf_node.inputs['Alpha'])
-            img_node.select = True
-            mat.node_tree.nodes.active = img_node
+
+            if not mat_ctx.diffuse_connected:
+                mat.node_tree.links.new(r_mix.outputs[2], ao_mix_node.inputs[6])
+                mat.node_tree.links.new(img_node.outputs['Alpha'], bsdf_node.inputs['Alpha'])
+                img_node.select = True
+                mat.node_tree.nodes.active = img_node
 
             mat_ctx.msk_index += 1
 
