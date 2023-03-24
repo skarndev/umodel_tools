@@ -1,10 +1,7 @@
 """This module holds configuration for the supported games.
    Each supported game must define its own material handling code.
-   In order to add a game, enter its name in the following list and implement
-   a material generation specifics module using the provided name.
+   In order to add a game, implement a material generation specifics module using the provided name.
    Nothing else should be needed to support a game.
-
-   The format is: ``('module_name', "Game Name for UI", "Game description for UI", number)``
    The module must implement the ``GameHandler`` protocol.
 """
 
