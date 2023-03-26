@@ -2,13 +2,14 @@ import json
 import math
 import os
 import typing as t
-import functools as ft
 
 import mathutils as mu
 import bpy
+import tqdm
 
 from . import asset_db
 from . import asset_importer
+from . import utils
 
 
 def split_object_path(object_path):
@@ -264,9 +265,9 @@ class MapImporter(asset_importer.AssetImporter):
     """
 
     @staticmethod
-    def _library_reload_mesh(objects: list[bpy.types.Object]):
-        for obj in objects:
-            obj.data.library.reload()
+    def _library_reload():
+        for lib in bpy.data.libraries:
+            lib.reload()
 
     def _import_map(self,
                     context: bpy.types.Context,
@@ -285,10 +286,8 @@ class MapImporter(asset_importer.AssetImporter):
         :return: True if succesful, else False.
         """
 
-        print(f"Importing map {map_path}")
-
         if not os.path.exists(map_path):
-            print(f"File {map_path} not found. Skipping.")
+            print(f"Error: File {map_path} not found. Skipping.")
             return False
 
         json_filename = os.path.basename(map_path)
@@ -299,36 +298,38 @@ class MapImporter(asset_importer.AssetImporter):
         with open(map_path, mode='r', encoding='utf-8') as file:
             json_object = json.load(file)
 
-            # Handle the different entity types
-            for entity in json_object:
-                if not entity.get('Type', None):
-                    continue
-
-                if (entity_type := entity.get('Type')) in StaticMesh.static_mesh_types:
-                    static_mesh = StaticMesh(entity, entity_type)
-
-                    if static_mesh.invalid:
-                        print(f"Skipping instance of {static_mesh.entity_name}. Invalid property.")
+            # handle the different entity types (mehses, lights, etc)
+            with utils.std_out_err_redirect_tqdm() as orig_stdout:
+                for entity in tqdm.tqdm(json_object,
+                                        desc=f"Importing map \"{os.path.splitext(os.path.basename(map_path))[0]}\":",
+                                        file=orig_stdout,
+                                        ascii=True):
+                    if not entity.get('Type', None):
                         continue
 
-                    obj = self._load_asset(
-                        context=context,
-                        asset_dir=asset_dir,
-                        asset_path=static_mesh.asset_path,
-                        umodel_export_dir=umodel_export_dir,
-                        load=True,
-                        db=db,
-                        game_profile=game_profile
-                    )
+                    # static meshes
+                    if (entity_type := entity.get('Type')) in StaticMesh.static_mesh_types:
+                        static_mesh = StaticMesh(entity, entity_type)
 
-                    if obj is None:
-                        print(f"Skipping instance of {static_mesh.entity_name} due to import failure.")
-                        continue
+                        if static_mesh.invalid:
+                            utils.verbose_print(f"Skipping instance of {static_mesh.entity_name}. Invalid property.")
+                            continue
 
-                    obj_instances = static_mesh.link_object_instance(obj, import_collection)
+                        if (obj := self._load_asset(
+                            context=context,
+                            asset_dir=asset_dir,
+                            asset_path=static_mesh.asset_path,
+                            umodel_export_dir=umodel_export_dir,
+                            load=True,
+                            db=db,
+                            game_profile=game_profile
+                        )) is None:
+                            print(f"Error: Skipping instance of {static_mesh.entity_name} due to import failure.")
+                            continue
 
-                    if obj_instances:
-                        bpy.app.timers.register(ft.partial(self._library_reload_mesh, obj_instances),
-                                                first_interval=0.01)
+                        static_mesh.link_object_instance(obj, import_collection)
+
+        # TODO: required due to unknown reason, blender bug? Otherwise, some meshes have None materials.
+        bpy.app.timers.register(self._library_reload, first_interval=0.010)
 
         return True

@@ -1,7 +1,9 @@
 import typing as t
+import io
 import os
 import traceback
 import shutil
+import contextlib
 
 from io_import_scene_unreal_psa_psk_280 import pskimport  # pylint: disable=import-error
 import bpy
@@ -94,6 +96,9 @@ class AssetImporter:
                                               umodel_export_dir=umodel_export_dir, db=db, game_profile=game_profile)
 
             if load:
+                if (linked_data := utils.linked_libraries_search(asset_path_abs, bpy.types.Object)):
+                    return linked_data
+
                 with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
                     data_to.objects = list(data_from.objects)
                     assert len(data_to.objects) == 1
@@ -113,7 +118,7 @@ class AssetImporter:
                                  db: asset_db.AssetDB):
         """Import image texture to asset library from UModel output.
 
-        :param tex_path: Path to texture in game format.
+        :param tex_path: Path to texture in game format.````
         :param tex_lib_path: Path to texture in the library dir (absolute).
         :param tex_umodel_path: Path to texture in the UModel output dir (absolute).
         """
@@ -278,12 +283,13 @@ class AssetImporter:
                                      ", but it does not exist in the UModel export path.")
                     continue
 
-            # load datablock from the library
-            with bpy.data.libraries.load(filepath=tex_lib_blend_path, link=True) as (data_from, data_to):
-                # we assume there is exactly one texture we have just written there
-                data_to.images = [data_from.images[0]]
+            if (img := utils.linked_libraries_search(tex_lib_blend_path, bpy.types.Image)) is None:
+                # load datablock from the library
+                with bpy.data.libraries.load(filepath=tex_lib_blend_path, link=True) as (data_from, data_to):
+                    # we assume there is exactly one texture we have just written there
+                    data_to.images = [data_from.images[0]]
 
-            img = data_to.images[0]
+                img = data_to.images[0]
 
             img_node = new_mat.node_tree.nodes.new('ShaderNodeTexImage')
             img_node.image = img
@@ -344,39 +350,34 @@ class AssetImporter:
 
         os.makedirs(asset_absolute_dir, exist_ok=True)
 
-        # create a temporary scene to perform the PSKX import.
-        temp_scene = bpy.data.scenes.new('Temp Scene')
-
         asset_psk_path_noext = os.path.join(umodel_export_dir, asset_path_local_noext)
 
-        psk_ctx = utils.ContextWrapper(context.copy())
-        psk_ctx.scene = temp_scene
-        psk_ctx.collection = temp_scene.collection
-        psk_ctx.view_layer = temp_scene.view_layers[0]
-
         if os.path.isfile(pskx_path := asset_psk_path_noext + '.pskx'):
-            if not pskimport(filepath=pskx_path,
-                             context=psk_ctx,
-                             bImportbone=False):
-                bpy.data.scenes.remove(temp_scene, do_unlink=True)
-                raise RuntimeError(f"Failed importing asset {asset_psk_path_noext + '.pskx'} due to unknown reason.")
+            utils.verbose_print(f"Importing \"{pskx_path}\"")
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                if not pskimport(filepath=pskx_path,
+                                 context=context,
+                                 bImportbone=False):
+                    raise RuntimeError(f"Error:Failed importing asset {asset_psk_path_noext + '.pskx'} "
+                                       "due to unknown reason.")
 
             animated = False
         elif os.path.isfile(psk_path := asset_psk_path_noext + '.psk'):
-            if not pskimport(filepath=psk_path,
-                             context=psk_ctx,
-                             bImportbone=False):
-                bpy.data.scenes.remove(temp_scene, do_unlink=True)
-                raise RuntimeError(f"Failed importing asset {asset_psk_path_noext + '.psk'} due to unknown reason.")
+            utils.verbose_print(f"Importing \"{psk_path}\"")
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                if not pskimport(filepath=psk_path,
+                                 context=context,
+                                 bImportbone=False):
+                    raise RuntimeError(f"Error: Failed importing asset {asset_psk_path_noext + '.psk'} "
+                                       "due to unknown reason.")
             animated = True
 
         else:
-            bpy.data.scenes.remove(temp_scene, do_unlink=True)
-            raise FileNotFoundError(f"Failed importing asset {asset_psk_path_noext} was not found (.psk/.pskx).")
+            raise FileNotFoundError(f"Error: Failed importing asset {asset_psk_path_noext} was not found (.psk/.pskx).")
 
-        # we presume that if the object is succesfully imported, there is exactly one object in the scene collection
-        obj = temp_scene.collection.objects[0]
-        assert len(temp_scene.collection.objects) == 1  # TODO: check if this presumption is valid
+        obj = context.object
 
         # mark object as asset
         obj.asset_mark()
@@ -420,7 +421,6 @@ class AssetImporter:
 
                         bpy.data.objects.remove(obj, do_unlink=True)
                         bpy.data.meshes.remove(mesh, do_unlink=True)
-                        bpy.data.scenes.remove(temp_scene, do_unlink=True)
 
                         old_materials = list(mesh.materials)
 
@@ -463,13 +463,14 @@ class AssetImporter:
                                                          asset_library_dir=asset_library_dir,
                                                          game_profile=game_profile)
 
-                    # load material from the library
-                    with bpy.data.libraries.load(filepath=material_lib_path, link=True) as (data_from, data_to):
+                    if (new_mat := utils.linked_libraries_search(material_lib_path, bpy.types.Material)) is None:
+                        # load material from the library
+                        with bpy.data.libraries.load(filepath=material_lib_path, link=True) as (data_from, data_to):
+                            # we presume there is exactly one material in the library, no validation performed
+                            data_to.materials = [data_from.materials[0]]
 
-                        # we presume there is exactly one material in the library, no validation performed
-                        data_to.materials = [data_from.materials[0]]
+                        new_mat = data_to.materials[0]
 
-                    new_mat = data_to.materials[0]
                 except OSError:
                     new_mat = bpy.data.materials.new(f"{material_name}_Placeholder")
                     self._op_message('WARNING',
@@ -507,8 +508,6 @@ class AssetImporter:
                 bpy.data.materials.remove(mat, do_unlink=True)
             except ReferenceError:
                 pass
-
-        bpy.data.scenes.remove(temp_scene, do_unlink=True)
 
         if not has_external_db:
             db.save_db()

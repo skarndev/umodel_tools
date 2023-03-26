@@ -1,7 +1,5 @@
 
 import os
-import contextlib
-import sys
 import typing as t
 
 import numpy as np
@@ -16,20 +14,6 @@ from . import asset_importer
 from . import asset_db
 from . import map_importer
 from . import preferences
-
-
-@contextlib.contextmanager
-def std_out_err_redirect_tqdm():
-    orig_out_err = sys.stdout, sys.stderr
-    try:
-        sys.stdout, sys.stderr = map(tqdm.contrib.DummyTqdmFile, orig_out_err)
-        yield orig_out_err[0]
-    # Relay exceptions
-    except Exception as exc:
-        raise exc
-    # Always restore sys.stdout/err if necessary
-    finally:
-        sys.stdout, sys.stderr = orig_out_err
 
 
 def _get_object_aabb_verts(obj: bpy.types.Object) -> list[tuple[float, float, float]]:
@@ -207,7 +191,7 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
                 total_models += 1
 
         db = asset_db.AssetDB(asset_dir)
-        with std_out_err_redirect_tqdm() as orig_stdout:
+        with utils.std_out_err_redirect_tqdm() as orig_stdout:
             with tqdm.tqdm(total=total_models, file=orig_stdout, dynamic_ncols=True, ascii=True,
                            desc="Importing assets") as progress_bar:
                 for root, _, files in os.walk(asset_sub_dir_abs):
