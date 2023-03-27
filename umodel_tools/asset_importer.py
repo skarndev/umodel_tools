@@ -46,6 +46,8 @@ class AssetImporter:
 
     _unrecognized_texture_types: set[str] = set()
 
+    _has_warnings: bool = False
+
     def _op_message(self, msg_type: t.Literal['INFO'] | t.Literal['ERROR'] | t.Literal['WARNING'], msg: str):
         """Print operator message and return the associated status-code.
 
@@ -64,6 +66,21 @@ class AssetImporter:
                 return {'FINISHED'}
             case _:
                 raise NotImplementedError()
+
+    def _warn_print(self, *args: t.Any) -> None:
+        """Print a message and mark that an operation had warnings.
+        :param args: Arguments to internal print() call.
+        """
+        self._has_warnings = True
+        print(*args)
+
+    def _print_unrecognized_textures(self) -> None:
+        """Print all unrecognized texture map names found. Useful for adding support for new games.
+        """
+        if utils.preferences.get_addon_preferences().verbose:
+            print("Unrecognized texture types found:")
+            print(self._unrecognized_texture_types)
+            self._unrecognized_texture_types.clear()
 
     def _load_asset(self,
                     context: bpy.types.Context,
@@ -99,11 +116,12 @@ class AssetImporter:
                 if (linked_data := utils.linked_libraries_search(asset_path_abs, bpy.types.Object)):
                     return linked_data
 
-                with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
-                    data_to.objects = list(data_from.objects)
-                    assert len(data_to.objects) == 1
+                with utils.redirect_cstdout():
+                    with bpy.data.libraries.load(asset_path_abs, link=True) as (data_from, data_to):
+                        data_to.objects = list(data_from.objects)
+                        assert len(data_to.objects) == 1
 
-                return data_to.objects[0]
+                    return data_to.objects[0]
 
             return None
 
@@ -201,8 +219,8 @@ class AssetImporter:
                             special_blend_mode = enums.SpecialBlendingMode.Mod
                             new_mat.blend_method = 'BLEND'
                         case _:
-                            self._op_message('WARNING', f"Unknown blending mode \'{blend_mode}\' found on importing "
-                                                        f"material \"{material_name}\".")
+                            self._warn_print(f"Warning: Unknown blending mode \'{blend_mode}\' found on importing "
+                                             f"material \"{material_name}\".")
 
                 if self.import_backface_culling and (two_sided := base_prop_overrides.get('TwoSided')) is not None:
                     new_mat.use_backface_culling = not two_sided
@@ -278,18 +296,18 @@ class AssetImporter:
                                                   tex_umodel_path=tex_path_abs,
                                                   db=db)
                 else:
-                    self._op_message('WARNING',
-                                     f"Material \"{material_name}\" referenced texture \"{tex_path}\" "
+                    self._warn_print(f"Warning: Material \"{material_name}\" referenced texture \"{tex_path}\" "
                                      ", but it does not exist in the UModel export path.")
                     continue
 
             if (img := utils.linked_libraries_search(tex_lib_blend_path, bpy.types.Image)) is None:
                 # load datablock from the library
-                with bpy.data.libraries.load(filepath=tex_lib_blend_path, link=True) as (data_from, data_to):
-                    # we assume there is exactly one texture we have just written there
-                    data_to.images = [data_from.images[0]]
+                with utils.redirect_cstdout():
+                    with bpy.data.libraries.load(filepath=tex_lib_blend_path, link=True) as (data_from, data_to):
+                        # we assume there is exactly one texture we have just written there
+                        data_to.images = [data_from.images[0]]
 
-                img = data_to.images[0]
+                    img = data_to.images[0]
 
             img_node = new_mat.node_tree.nodes.new('ShaderNodeTexImage')
             img_node.image = img
@@ -359,7 +377,7 @@ class AssetImporter:
                 if not pskimport(filepath=pskx_path,
                                  context=context,
                                  bImportbone=False):
-                    raise RuntimeError(f"Error:Failed importing asset {asset_psk_path_noext + '.pskx'} "
+                    raise RuntimeError(f"Error: Failed importing asset {asset_psk_path_noext + '.pskx'} "
                                        "due to unknown reason.")
 
             animated = False
@@ -375,7 +393,8 @@ class AssetImporter:
             animated = True
 
         else:
-            raise FileNotFoundError(f"Error: Failed importing asset {asset_psk_path_noext} was not found (.psk/.pskx).")
+            raise FileNotFoundError(f"Error: Failed importing asset: {asset_psk_path_noext} was not found "
+                                    "(.psk/.pskx).")
 
         obj = context.object
 
@@ -392,7 +411,7 @@ class AssetImporter:
             _, mat_descriptors_paths = props_txt_parser.parse_props_txt(asset_psk_path_noext + '.props.txt',
                                                                         mode='MESH')
         except OSError:
-            self._op_message('WARNING', f"Loading material descriptor {asset_psk_path_noext + '.props.txt'} failed. "
+            self._warn_print(f"Warning: Loading material descriptor {asset_psk_path_noext + '.props.txt'} failed. "
                              "Materials will not be avaialble for the imported object.")
         else:
             # attempt to obtain materials manually if descriptor is not available
@@ -409,14 +428,14 @@ class AssetImporter:
                             mat_name = os.path.basename(file_abs)
 
                             if mat_name not in mat_desc_order_map:
-                                self._op_message('WARNING', f"Found extra material {mat_name} in the Materials dir. "
+                                self._warn_print(f"Warning: Found extra material {mat_name} in the Materials dir. "
                                                  "It won't be imported.")
                                 continue
 
                             mat_desc_order_map[mat_name] = f"{os.path.relpath(file_abs, umodel_export_dir)}.{mat_name}"
 
                     if any(mat_desc is None for mat_desc in mat_desc_order_map.values()):
-                        self._op_message('ERROR', "Material count mismatch.")
+                        print(f"Warning: Material count mismatch for asset \"{obj.name}\".")
                         mesh = obj.data
 
                         bpy.data.objects.remove(obj, do_unlink=True)
@@ -465,17 +484,21 @@ class AssetImporter:
 
                     if (new_mat := utils.linked_libraries_search(material_lib_path, bpy.types.Material)) is None:
                         # load material from the library
-                        with bpy.data.libraries.load(filepath=material_lib_path, link=True) as (data_from, data_to):
-                            # we presume there is exactly one material in the library, no validation performed
-                            data_to.materials = [data_from.materials[0]]
+                        with utils.redirect_cstdout():
+                            with bpy.data.libraries.load(filepath=material_lib_path, link=True) as (data_from, data_to):
+                                # we presume there is exactly one material in the library, no validation performed
+                                data_to.materials = [data_from.materials[0]]
 
-                        new_mat = data_to.materials[0]
+                            new_mat = data_to.materials[0]
+
+                except FileNotFoundError as e:
+                    new_mat = bpy.data.materials.new(f"{material_name}_Placeholder")
+                    self._warn_print(f"Warning: Material \"{material_name}\" failed to load, placeholder used instead. "
+                                     f"({e}).")
 
                 except OSError:
                     new_mat = bpy.data.materials.new(f"{material_name}_Placeholder")
-                    self._op_message('WARNING',
-                                     f"Material \"{material_name}\" failed to load, placeholder used instead.")
-                    traceback.print_exc()
+                    self._warn_print(f"Warning: Material \"{material_name}\" failed to load, placeholder used instead.")
 
                 new_materials.append((new_mat, material_name))
 

@@ -301,8 +301,9 @@ class MapImporter(asset_importer.AssetImporter):
             # handle the different entity types (mehses, lights, etc)
             with utils.std_out_err_redirect_tqdm() as orig_stdout:
                 for entity in tqdm.tqdm(json_object,
-                                        desc=f"Importing map \"{os.path.splitext(os.path.basename(map_path))[0]}\":",
+                                        desc=f"Importing map \"{os.path.splitext(os.path.basename(map_path))[0]}\"",
                                         file=orig_stdout,
+                                        dynamic_ncols=True,
                                         ascii=True):
                     if not entity.get('Type', None):
                         continue
@@ -312,7 +313,8 @@ class MapImporter(asset_importer.AssetImporter):
                         static_mesh = StaticMesh(entity, entity_type)
 
                         if static_mesh.invalid:
-                            utils.verbose_print(f"Skipping instance of {static_mesh.entity_name}. Invalid property.")
+                            utils.verbose_print(f"Info: Skipping instance of {static_mesh.entity_name}. "
+                                                "Invalid property.")
                             continue
 
                         if (obj := self._load_asset(
@@ -324,7 +326,8 @@ class MapImporter(asset_importer.AssetImporter):
                             db=db,
                             game_profile=game_profile
                         )) is None:
-                            print(f"Error: Skipping instance of {static_mesh.entity_name} due to import failure.")
+                            self._warn_print(f"Warning: Skipping instance of {static_mesh.entity_name} due to import "
+                                             "failure.")
                             continue
 
                         static_mesh.link_object_instance(obj, import_collection)

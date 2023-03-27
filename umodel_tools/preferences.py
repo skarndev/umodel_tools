@@ -134,16 +134,26 @@ class UMODELTOOLS_AP_addon_preferences(bpy.types.AddonPreferences):
         default=False
     )
 
+    debug: bpy.props.BoolProperty(
+        name="Debug",
+        description="Enables debugging output, intended for developers only",
+        default=False
+    )
+
     def get_active_profile(self) -> t.Optional[UMODELTOOLS_PG_game_profile]:
         try:
             return self.profiles[self.active_profile_index]
         except IndexError:
             return None
 
-    def draw(self, _context: bpy.types.Context):
+    def draw(self, context: bpy.types.Context):
         layout = self.layout
         layout.prop(self, "display_cur_profile")
         layout.prop(self, "verbose")
+
+        if context.preferences.view.show_developer_ui:
+            layout.prop(self, "debug")
+
         layout.label(text="Game profiles:")
         row = layout.row()
         row.template_list("UMODELTOOLS_UL_game_profiles", "", self, "profiles", self, "active_profile_index")

@@ -17,40 +17,6 @@ os.close(tmphandle)
 os.remove(tmppath)
 
 
-class ContextWrapper:
-    """Used to wrap context objects copied as dictionary to simulate bpy.types.Context behavior.
-    """
-
-    def __init__(self, ctx_dct: dict) -> None:
-        self._ctx: dict = ctx_dct
-
-    def __getattr__(self, name: str) -> t.Any:
-        if name == '_ctx':
-            return object.__getattribute__(self, '_ctx')
-
-        return self._ctx[name]
-
-    def __getitem__(self, name: str) -> t.Any:
-        if name == '_ctx':
-            return object.__getattribute__(self, '_ctx')
-
-        return self._ctx[name]
-
-    def __setitem__(self, name: str, value: t.Any) -> None:
-        if name == '_ctx':
-            return object.__setattr__(self, '_ctx', value)
-
-        self._ctx[name] = value
-        return None
-
-    def __setattr__(self, name: str, value: t.Any) -> None:
-        if name == '_ctx':
-            return object.__setattr__(self, '_ctx', value)
-
-        self._ctx[name] = value
-        return None
-
-
 def copy_object(obj: bpy.types.Object) -> bpy.types.Object:
     """Copies an object and its mesh. No linking is performed.
 
@@ -132,3 +98,33 @@ def std_out_err_redirect_tqdm():
     # Always restore sys.stdout/err if necessary
     finally:
         sys.stdout, sys.stderr = orig_out_err
+
+
+@contextlib.contextmanager
+def redirect_cstdout(to=os.devnull):
+    """Redirect stdout from C/C++ parts of Blender and external libaries.
+    We use this to suppress library reading and linking messages.
+
+    :param to: _description_, defaults to os.devnull
+    :yield: _description_
+    """
+
+    # disable the whole redirect in debug mode
+    if preferences.get_addon_preferences().debug:
+        yield
+        return None
+
+    fd = sys.stdout.fileno()
+
+    def _redirect_stdout(to):
+        os.dup2(to.fileno(), fd)  # fd writes to 'to' file
+
+    with os.fdopen(os.dup(fd), 'w') as old_stdout:
+        with open(to, 'w') as file:  # pylint: disable=unspecified-encoding
+            _redirect_stdout(to=file)
+        try:
+            yield  # allow code to be run with the redirected stdout
+        finally:
+            _redirect_stdout(to=old_stdout)  # restore stdout
+
+    return None

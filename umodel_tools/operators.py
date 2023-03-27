@@ -114,9 +114,10 @@ class UMODELTOOLS_OT_recover_unreal_asset(asset_importer.AssetImporter, bpy.type
             context.collection.objects.link(new_obj)
             new_obj.select_set(True)
 
-        print("Unrecognized texture types found:")
-        print(self._unrecognized_texture_types)
-        self._unrecognized_texture_types.clear()
+        self._print_unrecognized_textures()
+
+        if self._has_warnings:
+            self._op_message('WARNING', "Asset import had warnnings. Check console for details.")
 
         return {'FINISHED'}
 
@@ -216,9 +217,10 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
 
         db.save_db()
 
-        print("Unrecognized texture types found:")
-        print(self._unrecognized_texture_types)
-        self._unrecognized_texture_types.clear()
+        self._print_unrecognized_textures()
+
+        if self._has_warnings:
+            self._op_message('WARNING', "Asset import had warnnings. Check console for details.")
 
         return {'FINISHED'}
 
@@ -288,9 +290,10 @@ class UMODELTOOLS_OT_import_unreal_map(map_importer.MapImporter, bpy.types.Opera
 
         db.save_db()
 
-        print("Unrecognized texture types found:")
-        print(self._unrecognized_texture_types)
-        self._unrecognized_texture_types.clear()
+        self._print_unrecognized_textures()
+
+        if self._has_warnings:
+            self._op_message('WARNING', "Asset import had warnnings. Check console for details.")
 
         return {'FINISHED'}
 
