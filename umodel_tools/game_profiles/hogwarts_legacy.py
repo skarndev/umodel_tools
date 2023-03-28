@@ -29,60 +29,71 @@ class TextureMapTypes(enum.Enum):
 
 #: Translates names retrieved from .props.txt into sensible texture map types
 TEXTURE_PARAM_NAME_TRS = {
-    "Diffuse": TextureMapTypes.Diffuse,
-    "Normal": TextureMapTypes.Normal,
-    "SRO": TextureMapTypes.SRO,
-    "MRO": TextureMapTypes.MRO,
-    "MROH": TextureMapTypes.MROH,
-    "MROH/SROH": TextureMapTypes.MROH,
-    "MRO/SRO": TextureMapTypes.MRO,
+    "diffuse": TextureMapTypes.Diffuse,
+    "normal": TextureMapTypes.Normal,
+    "sro": TextureMapTypes.SRO,
+    "mro": TextureMapTypes.MRO,
+    "mroh": TextureMapTypes.MROH,
+    "mroh/sroh": TextureMapTypes.MROH,
+    "mro/sro": TextureMapTypes.MRO,
 
-    "Diffuse Map": TextureMapTypes.Diffuse,
-    "Normal Map": TextureMapTypes.Normal,
-    "MRO/SRO Map": TextureMapTypes.SRO,
-    "SRO Map": TextureMapTypes.SRO,
-    "MROH Map": TextureMapTypes.MROH,
-    "MROH/SROH Map": TextureMapTypes.MROH,
-    "MRO Map": TextureMapTypes.MRO,
+    "diffuse map": TextureMapTypes.Diffuse,
+    "normal map": TextureMapTypes.Normal,
+    "mro/sro map": TextureMapTypes.SRO,
+    "sro map": TextureMapTypes.SRO,
+    "mroh map": TextureMapTypes.MROH,
+    "mroh/sroh map": TextureMapTypes.MROH,
+    "mro map": TextureMapTypes.MRO,
 
-    "Diffuse A": TextureMapTypes.Diffuse,
-    "Normal A": TextureMapTypes.Normal,
-    "SRO A": TextureMapTypes.SRO,
-    "MROH A": TextureMapTypes.MROH,
-    "MROH/SROH A": TextureMapTypes.MROH,
-    "MRO/SRO A": TextureMapTypes.MRO,
-    "MRO A": TextureMapTypes.MROH,
+    "diffuse a": TextureMapTypes.Diffuse,
+    "normal a": TextureMapTypes.Normal,
+    "sro a": TextureMapTypes.SRO,
+    "mroh a": TextureMapTypes.MROH,
+    "mroh/sroh a": TextureMapTypes.MROH,
+    "mro/sro a": TextureMapTypes.MRO,
+    "mro a": TextureMapTypes.MROH,
 
-    "Diffuse Map A": TextureMapTypes.Diffuse,
-    "Normal Map A": TextureMapTypes.Normal,
-    "SRO Map A": TextureMapTypes.SRO,
-    "MROH Map A": TextureMapTypes.MROH,
-    "MROH/SROH Map A": TextureMapTypes.MROH,
-    "MRO/SRO Map A": TextureMapTypes.MRO,
-    "MRO Map A": TextureMapTypes.MROH,
+    "diffuse map a": TextureMapTypes.Diffuse,
+    "normal map a": TextureMapTypes.Normal,
+    "sro map a": TextureMapTypes.SRO,
+    "mroh map a": TextureMapTypes.MROH,
+    "mroh/sroh map a": TextureMapTypes.MROH,
+    "mro/sro map a": TextureMapTypes.MRO,
+    "mro map a": TextureMapTypes.MROH,
 
-    "Diffuse A Map": TextureMapTypes.Diffuse,
-    "Normal A Map": TextureMapTypes.Normal,
-    "SRO A Map": TextureMapTypes.SRO,
-    "MRO/SRO A Map": TextureMapTypes.SRO,
-    "MROH A Map": TextureMapTypes.MROH,
-    "MROH/SROH A Map": TextureMapTypes.MROH,
-    "MRO A Map": TextureMapTypes.MROH,
+    "diffuse a map": TextureMapTypes.Diffuse,
+    "normal a map": TextureMapTypes.Normal,
+    "sro a map": TextureMapTypes.SRO,
+    "mro/sro a map": TextureMapTypes.SRO,
+    "mroh a map": TextureMapTypes.MROH,
+    "mroh/sroh a map": TextureMapTypes.MROH,
+    "mro a map": TextureMapTypes.MROH,
 
     # Weird stuff goes here
-    "Color Glass": TextureMapTypes.Diffuse,
-    "Base color": TextureMapTypes.Diffuse,
-    "Base Color": TextureMapTypes.Diffuse,
-    "MROA": TextureMapTypes.MRO,  # TODO: A stands for what?,
-    "Color Mask": TextureMapTypes.MSK,
-    "Wear Mask": TextureMapTypes.WEAR_MSK,
-    "Worn Diffuse": TextureMapTypes.Diffuse,
-    "Worn Normal": TextureMapTypes.Normal,
-    "Worn SRO": TextureMapTypes.SRO,
-    "Worn MRO": TextureMapTypes.MRO,
-    "Worn MROH": TextureMapTypes.MROH,
-    "Worn MROH/SROH": TextureMapTypes.MROH,
-    "Worn MRO/SRO": TextureMapTypes.MRO,
+    "color glass": TextureMapTypes.Diffuse,
+    "base color": TextureMapTypes.Diffuse,
+    "mroa": TextureMapTypes.MRO,  # TODO: A stands for what?,
+    "color mask": TextureMapTypes.MSK,
+    "wear mask": TextureMapTypes.WEAR_MSK,
+    "worn diffuse": TextureMapTypes.Diffuse,
+    "worn normal": TextureMapTypes.Normal,
+    "worn sro": TextureMapTypes.SRO,
+    "worn mro": TextureMapTypes.MRO,
+    "worn mroh": TextureMapTypes.MROH,
+    "worn mroh/sroh": TextureMapTypes.MROH,
+    "worn mro/sro": TextureMapTypes.MRO
+}
+
+#: Suffixes of textures for automatic texture purpose guessing (lowercase only)
+SUFFIX_MAP = {
+    'd': TextureMapTypes.Diffuse,
+    'n': TextureMapTypes.Normal,
+    'mro': TextureMapTypes.MRO,
+    'sro': TextureMapTypes.SRO,
+    'mroh': TextureMapTypes.MROH,
+    'mroa': TextureMapTypes.MRO,  # TODO: figure out what MROA means.
+    'sroh': TextureMapTypes.MROH,  # TODO: verify, just in case, if SROH is actually a thing.
+    'msk': TextureMapTypes.MSK
 }
 
 
@@ -93,6 +104,7 @@ class MaterialContext:
     use_pbr: bool
     msk_index: int = dataclasses.field(default=0)
     diffuse_connected: bool = dataclasses.field(default=False)
+    linked_maps: set[TextureMapTypes.Diffuse] = dataclasses.field(default_factory=set)
 
 
 _state_buffer: dict[bpy.types.Material, MaterialContext] = {}
@@ -102,12 +114,12 @@ def process_material(mat: bpy.types.Material, desc_ast: lark.Tree, use_pbr: bool
     _state_buffer[mat] = MaterialContext(bsdf_node=None, desc_ast=desc_ast, use_pbr=use_pbr)
 
 
-def do_process_texture(tex_type: str) -> bool:
-    return tex_type in TEXTURE_PARAM_NAME_TRS
+def do_process_texture(tex_type: str, tex_short_name: str) -> bool:  # pylint: disable=unused-argument
+    return tex_type.lower() in TEXTURE_PARAM_NAME_TRS
 
 
 def is_diffuse_tex_type(tex_type: str) -> bool:
-    return TEXTURE_PARAM_NAME_TRS.get(tex_type) in {TextureMapTypes.Diffuse, TextureMapTypes.MSK}
+    return TEXTURE_PARAM_NAME_TRS.get(tex_type.lower()) in {TextureMapTypes.Diffuse, TextureMapTypes.MSK}
 
 
 def handle_material_texture_pbr(mat: bpy.types.Material,
@@ -121,8 +133,14 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
     mat_ctx = _state_buffer[mat]
     mat_ctx.bsdf_node = bsdf_node
 
-    bl_tex_type = TEXTURE_PARAM_NAME_TRS.get(tex_type)
-    assert bl_tex_type is not None
+    bl_tex_type = TEXTURE_PARAM_NAME_TRS.get(tex_type.lower())
+
+    # do not connect the same texture twice
+    if bl_tex_type in mat_ctx.linked_maps:
+        return
+
+    # remember that we processed a texture of that type
+    mat_ctx.linked_maps.add(bl_tex_type)
 
     match bl_tex_type:
         case TextureMapTypes.Diffuse:

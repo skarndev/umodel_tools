@@ -264,17 +264,17 @@ class AssetImporter:
             new_mat.node_tree.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
 
         for tex_type, tex_path_and_name in texture_infos.items():
-            # skip the texture if we don't know what to do with it
-
-            if not game_profile_impl.do_process_texture(tex_type):
-                self._unrecognized_texture_types.add(tex_type)
-                continue
 
             # skip non-diffuse textures if we do not import PBR
             if not self.load_pbr_maps and not game_profile_impl.is_diffuse_tex_type(tex_type):
                 continue
 
-            tex_path_no_ext, _ = os.path.splitext(tex_path_and_name)
+            tex_path_no_ext, tex_short_name = os.path.splitext(tex_path_and_name)
+
+            # skip the texture if we don't know what to do with it
+            if not game_profile_impl.do_process_texture(tex_type, tex_short_name):
+                self._unrecognized_texture_types.add(tex_type)
+                continue
 
             # normalize path from config
             tex_path_no_ext = os.path.normpath(tex_path_no_ext)

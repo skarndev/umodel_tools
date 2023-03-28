@@ -36,10 +36,11 @@ class GameHandler(t.Protocol):
         :use_pbr: True if material is imported in a PBR mode.
         """
 
-    def do_process_texture(tex_type: str) -> bool:
+    def do_process_texture(tex_type: str, tex_short_name: str) -> bool:
         """Determines whether to process the texture or not.
 
         :param tex_type: Texture type string retrieved from .props.txt.
+        :param tex_short_name: Basename of the texture file without extension.
         :return: True if should process, False if should discard.
         """
 
