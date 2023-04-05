@@ -32,7 +32,7 @@ class GameHandler(t.Protocol):
 
         :param mat: Blender material we are processing.
         :desc_ast: Lark AST tree representing the corresponding material descriptor. Can be used to obtain
-        any additional information required to implement game specifics.
+            any additional information required to implement game specifics.
         :use_pbr: True if material is imported in a PBR mode.
         """
 
