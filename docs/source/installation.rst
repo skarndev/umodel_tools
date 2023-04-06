@@ -46,10 +46,7 @@ You may want to install the addon from sources if you plan to alter the code, e.
    <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mklink?source=recommendations>`_,
    `Linux / Mac <https://en.wikipedia.org/wiki/Ln_(Unix)>`_) of the ``umodel_tools/umodel_tools`` directory to the
    Blender add-on directory.
-8. Enable the addon in t
-
-After the installation is complete, you should be able to see the add-on's settings available in the add-on list.
-
+8. After the installation is complete, you should be able to see the addon in the installed add-ons list. Enable it.
 
 Installing UEViewer (UModel)
 -----------------------------------------

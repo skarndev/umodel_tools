@@ -13,7 +13,12 @@ project = 'umodel_tools'
 copyright = '2023, Skarn'  # pylint: disable=redefined-builtin
 author = 'Skarn'
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon',
+              'sphinx.ext.intersphinx']
+
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
+                       'bpy': ('https://docs.blender.org/api/current/', None),
+                       'lark': ('https://lark-parser.readthedocs.io/en/latest/', None)}
 
 # autodoc configuration
 autodoc_preserve_defaults = True

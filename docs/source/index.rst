@@ -17,9 +17,8 @@ Overview
 
    installation
    configuration
-
-.. automodule:: umodel_tools.game_profiles.__init__
-    :members:
+   create_game_profile
+   supported_games
 
 Indices and tables
 ==================
