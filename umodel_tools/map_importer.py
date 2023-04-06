@@ -67,6 +67,7 @@ class StaticMesh:
     is_instanced: bool = False
     not_rendered: bool = False
     invisible: bool = False
+    bad_creation_method: bool = False
 
     def __init__(self, json_entity: t.Any, entity_type: str) -> None:
         self.entity_name = json_entity.get("Outer", 'Error')
@@ -95,6 +96,10 @@ class StaticMesh:
 
         if (is_visbile := props.get("bVisible", None)) is not None and not is_visbile:
             self.invisible = True
+
+        if ((creation_method := props.get("CreationMethod", None)) is not None
+           and creation_method == "EComponentCreationMethod::UserConstructionScript"):
+            self.bad_creation_method = True
 
         objpath = split_object_path(object_path)
 
@@ -160,7 +165,7 @@ class StaticMesh:
     @property
     def invalid(self):
         return (self.no_path or self.no_entity or self.base_shape or self.no_mesh or self.no_per_instance_data
-                or self.not_rendered or self.invisible)
+                or self.not_rendered or self.invisible or self.bad_creation_method)
 
     def link_object_instance(self,
                              obj: bpy.types.Object,
