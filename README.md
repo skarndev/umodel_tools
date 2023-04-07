@@ -6,6 +6,8 @@ A [Blender](https://blender.org>) add-on featuring import of [Unreal Engine](htt
 games static meshes (stored in-game as .uasset) and maps (stored in-game as .umap). It provides basic support for many
 UE games, while [some](https://skarndev.github.io/umodel_tools/supported_games.html) have dedicated improved support.
 
+![](/docs/source/images/demo.jpeg?raw=true "Demo")
+
 # Documentation
 You can learn how to install and use the add-on on the
 [documentation page](https://skarndev.github.io/umodel_tools/).
