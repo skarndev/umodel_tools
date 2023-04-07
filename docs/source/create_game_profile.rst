@@ -14,7 +14,7 @@ Game support steps
    ``umodel_tools/__init__.py`` file. The functions should be implemented as free-standing functions, not methods.
 
 
-API
+Game profile API
 ----------------------------------------
 .. automodule:: umodel_tools.game_profiles.__init__
     :members:
