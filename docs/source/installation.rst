@@ -8,6 +8,9 @@ A pre-packed distribution includes all the addon dependencies and does not requi
 performed on it. It is installed as a regular Blender
 `add-on <https://docs.blender.org/manual/en/latest/editors/preferences/addons.html>`_.
 
+.. note::
+    Blender 3.4 or newer is required for the add-on to run.
+
 1. Download a release distribution from the `releases <https://github.com/skarndev/umodel_tools/releases>`_ page.
 2. Install the addon.
 

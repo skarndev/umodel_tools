@@ -1,10 +1,6 @@
-# Configuration file for the Sphinx documentation builder.
-#
-# For the full list of built-in configuration values, see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
+"""Documentation configuration script
+"""
 
-# -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
@@ -29,5 +25,16 @@ exclude_patterns = []
 
 # output configuration
 html_theme = "pydata_sphinx_theme"
+
+html_theme_options = {
+    'github_url': "https://github.com/skarndev/umodel_tools",
+    'navigation_depth': 2
+}
+
+html_sidebars = {
+    "**": ["sidebar-nav-bs", "sidebar-ethical-ads"],
+    "index": [],
+    "auto_examples/index": [],
+}
 
 html_static_path = ['_static']
