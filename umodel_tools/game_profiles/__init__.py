@@ -1,8 +1,4 @@
-"""This module holds configuration for the supported games.
-   Each supported game must define its own material handling code.
-   In order to add a game, implement a material generation specifics module using the provided name.
-   Nothing else should be needed to support a game.
-   The module must implement the ``GameHandler`` protocol.
+"""This module holds the configuration protocol for the supported games.
 """
 
 # pylint: disable=no-self-argument

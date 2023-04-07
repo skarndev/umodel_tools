@@ -66,5 +66,7 @@ Installing FModel
 install it only if you want to import entire maps into Blender. It can be downloaded from their
 `website <https://fmodel.app>`_. Install the tool somewhere on your PC.
 
-``Note: FModel does not work on Linux or Mac, even through Wine. If you want to import maps, you need to use Windows.``
+.. warning::
+    FModel does not work on Linux or Mac, even through Wine. It is essential for importing maps. If you want to import
+    maps, you need to use Windows or ask somebody on Windows to export them for you.
 
