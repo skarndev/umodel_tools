@@ -38,7 +38,7 @@ You may want to install the addon from sources if you plan to alter the code, e.
 1. Install `python3 <https://www.python.org>`_ into your system, if you do not have it.
    It is recommended to use the same version of the interpreter as Blender's in-built one.
    In order to find out the version of Python in Blender, open the Python console (Shift + F4).
-   The version of Python will be printed as the first row.ddd
+   The version of Python will be printed as the first row.
 2. Make sure `pip <https://pip.pypa.io/en/stable/getting-started/>`_ is installed.
 3. Install `git <https://git-scm.com>`_ into your system, if you do not have it.
 4. Clone the repo with ``git clone https://github.com/skarndev/umodel_tools.git``.

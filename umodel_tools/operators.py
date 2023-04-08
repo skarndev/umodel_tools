@@ -133,11 +133,6 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
         description="Path to a subdirectory containing assets"
     )
 
-    render_previews: bpy.props.BoolProperty(
-        name="Render previews",
-        description="Render previews for assets",
-        default=False
-    )
 
     def invoke(self, context: bpy.types.Context, _: bpy.types.Event) -> set[int] | set[str]:
         wm: bpy.types.WindowManager = context.window_manager
@@ -249,12 +244,6 @@ class UMODELTOOLS_OT_import_unreal_map(map_importer.MapImporter, bpy.types.Opera
     directory: bpy.props.StringProperty(subtype='DIR_PATH')
 
     # end ImportHelper
-
-    render_previews: bpy.props.BoolProperty(
-        name="Render previews",
-        description="Render previews for assets",
-        default=False
-    )
 
     def execute(self, context: bpy.types.Context) -> set[str]:
         self._unrecognized_texture_types.clear()

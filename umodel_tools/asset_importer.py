@@ -351,7 +351,7 @@ class AssetImporter:
         :param game_profile: Game profile to import.
         :param db: Asset database to operate on. If given, no saving is performed, else the function handles
         everything by itself.
-        :raises OSError: Raised when an asset was not found in the UModel output dir or the failed opening.
+        :raises OSError: Raised when an asset was not found in the UModel output dir or failed opening.
         :raises FileNotFounderror: Raised when an asset was not found in the directory.
         :raises RuntimeError: Raised when an asset failed importing due to unknown .psk/.pskx importer issue.
         :raises NotImplementedError: Raised when requested game profile is not implemented or available.
