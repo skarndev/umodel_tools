@@ -16,8 +16,9 @@ Overview
 
    installation
    configuration
-   create_game_profile
+   usage
    supported_games
+   create_game_profile
 
 Indices and tables
 ==================

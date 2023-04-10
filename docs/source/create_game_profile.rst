@@ -1,4 +1,4 @@
-Creating a game profile
+Creating game profiles
 ========================================
 
 In order to provide dedicated support for any game, you need to implement a game profile Python module.
@@ -17,4 +17,5 @@ Game support steps
 Game profile API
 ----------------------------------------
 .. automodule:: umodel_tools.game_profiles.__init__
-    :members:
+    :show-inheritance:
+    :members: GameHandler

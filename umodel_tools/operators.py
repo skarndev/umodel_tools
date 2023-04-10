@@ -133,7 +133,6 @@ class UMODELTOOLS_OT_import_unreal_assets(asset_importer.AssetImporter, bpy.type
         description="Path to a subdirectory containing assets"
     )
 
-
     def invoke(self, context: bpy.types.Context, _: bpy.types.Event) -> set[int] | set[str]:
         wm: bpy.types.WindowManager = context.window_manager
 

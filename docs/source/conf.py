@@ -18,6 +18,7 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
 
 # autodoc configuration
 autodoc_preserve_defaults = True
+autodoc_typehints_format = 'fully-qualified'
 
 # general configuration
 templates_path = ['_templates']
@@ -25,6 +26,7 @@ exclude_patterns = []
 
 # output configuration
 html_theme = "pydata_sphinx_theme"
+html_title = "UModel Tools"
 
 html_theme_options = {
     'github_url': "https://github.com/skarndev/umodel_tools",
