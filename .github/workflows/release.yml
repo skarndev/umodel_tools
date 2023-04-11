@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - "*"
+      - '*'
 jobs:
   release:
     env:
@@ -18,7 +18,7 @@ jobs:
           sudo apt install zip
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          python -m build.py --dist build
+          python build.py --dist build
           zip -r umodel_tools.zip build
 
       - name: Create Release
