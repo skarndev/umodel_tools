@@ -1,0 +1,25 @@
+name: Release
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  release:
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      APP_NAME: 12_ft
+    runs-on: ubuntu-latest
+    permissions: write-all
+    name: Create GH Release
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Artifacts
+        run: |
+          sudo apt-get install zip
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m build.py --dist build
+          zip -r umodel_tools.zip build
+
+      - name: Create Release
+        run: gh release create ${GITHUB_REF#refs/*/} -t ${GITHUB_REF#refs/*/} umodel_tools.zip --generate-notes
