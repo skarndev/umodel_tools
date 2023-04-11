@@ -17,7 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # pylint: skip-file
-# pycodestyle: skip-file
+# pep8: noqa
 
 bl_info = {
     "name": "Import Unreal Skeleton Mesh (.psk)/Animation Set (.psa) (280)",

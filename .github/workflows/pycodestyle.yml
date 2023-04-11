@@ -16,5 +16,5 @@ jobs:
         sudo apt install pycodestyle -y
     - name: Run pycodestyle
       run: |
-        pycodestyle --statistics --verbose
-   
+        pycodestyle --statistics --verbose --exclude=**/third_party/*
+
