@@ -10,9 +10,25 @@ UE games, while [some](https://skarndev.github.io/umodel_tools/supported_games.h
 
 ![](/docs/source/images/demo.jpeg?raw=true "Demo")
 
-# Documentation
+# Features
+- Unreal Engine games map (.umap) and (.uasset) import.
+- Creation of asset library in Blender out of game's assets.
+- PBR materials.
+- Lights (experimental support).
+
+# Usage
 You can learn how to install and use the add-on on the
 [documentation page](https://skarndev.github.io/umodel_tools/).
+
+# Support
+You can support core feature development and adding more games at my
+[Boosty page](https://boosty.to/skarn).
+
+# Roadmap
+- Adding more games. 
+- Improving support for asset management.
+- Improving map import.
+- Improving lights import.
 
 # Disclaimer
 3D assets and maps used by most of the games are copyrighted property of game's owners.
