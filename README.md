@@ -1,4 +1,5 @@
 # umodel_tools
+[![](https://dcbadge.vercel.app/api/server/DJYZwyegSF)](https://discord.gg/DJYZwyegSF)
 ![PyLint](https://github.com/skarndev/umodel_tools/actions/workflows/pylint.yml/badge.svg)
 ![pycodestyle](https://github.com/skarndev/umodel_tools/actions/workflows/pycodestyle.yml/badge.svg)
 
