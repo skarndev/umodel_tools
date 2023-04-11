@@ -154,6 +154,7 @@ cython_debug/
 
 .idea/
 .vscode/
-/umodel_tools/third_party
+/umodel_tools/third_party/*
+!/umodel_tools/third_party/io_import_scene_unreal_psa_psk_280.py
 /docs/build
 /docs/build/*
