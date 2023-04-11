@@ -2,7 +2,7 @@
 UModel Tools
 ========================================
 
-.. image:: images/test.jpg
+.. image:: images/demo.jpeg
 
 Welcome to ``umodel_tools`` documentation. `umodel_tools <https://github.com/skarndev/umodel_tools>`_
 is a `Blender <https://blender.org>`_ addon featuring import of `Unreal Engine <https://www.unrealengine.com>`_

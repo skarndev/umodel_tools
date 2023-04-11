@@ -163,7 +163,7 @@ class StaticMesh:
                     self.instance_transforms.append(trs)
 
     @property
-    def invalid(self):
+    def invalid(self) -> bool:
         return (self.no_path or self.no_entity or self.base_shape or self.no_mesh or self.no_per_instance_data
                 or self.not_rendered or self.invisible or self.bad_creation_method)
 
@@ -201,22 +201,93 @@ class StaticMesh:
 class GameLight:
     light_types = [
         'SpotLightComponent',
-        'AnimatedLightComponent',
+        # 'AnimatedLightComponent',
         'PointLightComponent'
     ]
 
-    type = ""
+    type: str = ""
 
     entity_name: str = ""
     pos: tuple[float, float, float] = (0.0, 0.0, 0.0)
     rot: tuple[float, float, float] = (0.0, 0.0, 0.0)
     scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    color: tuple[float, float, float] = (1.0, 1.0, 1.0)
 
     no_entity = False
 
-    def __init__(self, json_entity):
+    color_temp_table_r = [
+        [2.52432244e+03, -1.06185848e-03, 3.11067539e+00],
+        [3.37763626e+03, -4.34581697e-04, 1.64843306e+00],
+        [4.10671449e+03, -8.61949938e-05, 6.41423749e-01],
+        [4.66849800e+03, 2.85655028e-05, 1.29075375e-01],
+        [4.60124770e+03, 2.89727618e-05, 1.48001316e-01],
+        [3.78765709e+03, 9.36026367e-06, 3.98995841e-01],
+    ]
+
+    color_temp_table_g = [
+        [-7.50343014e+02, 3.15679613e-04, 4.73464526e-01],
+        [-1.00402363e+03, 1.29189794e-04, 9.08181524e-01],
+        [-1.22075471e+03, 2.56245413e-05, 1.20753416e+00],
+        [-1.42546105e+03, -4.01730887e-05, 1.44002695e+00],
+        [-1.18134453e+03, -2.18913373e-05, 1.30656109e+00],
+        [-5.00279505e+02, -4.59745390e-06, 1.09090465e+00],
+    ]
+
+    color_temp_table_b = [
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [-2.02524603e-11, 1.79435860e-07, -2.60561875e-04, -1.41761141e-02],
+        [-2.22463426e-13, -1.55078698e-08, 3.81675160e-04, -7.30646033e-01],
+        [6.72595954e-13, -2.73059993e-08, 4.24068546e-04, -7.52204323e-01],
+    ]
+
+    @staticmethod
+    def temp_to_color(temp: float) -> tuple[float, float, float]:
+        """Convert kelvin temperature to lamp color
+
+        :param temp: Temperature in Kelvin.
+        :return: Color.
+        """
+        if temp >= 12000.0:
+            return (0.826270103, 0.994478524, 1.56626022)
+        if temp < 965.0:
+            return (4.70366907, 0.0, 0.0)
+
+        i = 0
+        if temp >= 6365.0:
+            i = 5
+        elif temp >= 3315.0:
+            i = 4
+        elif temp >= 1902.0:
+            i = 3
+        elif temp >= 1449.0:
+            i = 2
+        elif temp >= 1167.0:
+            i = 1
+        else:
+            i = 0
+
+        r = GameLight.color_temp_table_r[i]
+        g = GameLight.color_temp_table_g[i]
+        b = GameLight.color_temp_table_b[i]
+
+        temp_inv = 1 / temp
+        return (r[0] * temp_inv + r[1] * temp + r[2],
+                g[0] * temp_inv + g[1] * temp + g[2],
+                ((b[0] * temp + b[1]) * temp + b[2]) * temp + b[3])
+
+    @property
+    def invalid(self) -> bool:
+        return self.no_entity
+
+    def __init__(self, json_entity) -> None:
         self.entity_name = json_entity.get("Outer", 'Error')
-        self.type = json_entity.get("SpotLightComponent", "SpotLightComponent")
+        self.type = json_entity.get("Type", None)
+
+        if not self.type:
+            self.no_entity = True
+            return None
 
         props = json_entity.get("Properties", None)
         if not props:
@@ -228,13 +299,17 @@ class GameLight:
             pos = props.get("RelativeLocation")
             self.pos = [pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100]
 
-        if props.get("RelativeRotation", False):
-            rot = props.get("RelativeRotation")
-            self.rot = [rot.get("Roll"), rot.get("Pitch") * -1, rot.get("Yaw") * -1]
+        if (rot := props.get("RelativeRotation", None)) is not None:
+            self.rot = (rot.get("Roll"),
+                        rot.get("Pitch"),
+                        rot.get("Yaw") * -1)
 
         if props.get("RelativeScale3D", False):
             scale = props.get("RelativeScale3D")
             self.scale = [scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1)]
+
+        if (temp := props.get("Temperature", None)) is not None:
+            self.color = self.temp_to_color(temp)
 
         # TODO: expand this method with more properties for the specific light types
         # Problem: I don't know how values for UE lights map to Blender's light types.
@@ -246,10 +321,11 @@ class GameLight:
             print(f"Refusing to import {self.entity_name} due to failed checks.")
             return False
 
-        if self.type == 'SpotLightComponent':
-            light_data = bpy.data.lights.new(name=self.entity_name, type='SPOT')
-        if self.type == 'PointLightComponent':
-            light_data = bpy.data.lights.new(name=self.entity_name, type='POINT')
+        match self.type:
+            case 'SpotLightComponent':
+                light_data = bpy.data.lights.new(name=self.entity_name, type='SPOT')
+            case 'PointLightComponent':
+                light_data = bpy.data.lights.new(name=self.entity_name, type='POINT')
 
         light_obj = bpy.data.objects.new(name=self.entity_name, object_data=light_data)
         light_obj.scale = (self.scale[0], self.scale[1], self.scale[2])
@@ -259,6 +335,7 @@ class GameLight:
                                              math.radians(self.rot[1]),
                                              math.radians(self.rot[2])),
                                             'XYZ')
+        light_data.color = self.color
         collection.objects.link(light_obj)
         bpy.context.scene.collection.objects.link(light_obj)
 
@@ -313,8 +390,10 @@ class MapImporter(asset_importer.AssetImporter):
                     if not entity.get('Type', None):
                         continue
 
+                    entity_type = entity.get('Type')
+
                     # static meshes
-                    if (entity_type := entity.get('Type')) in StaticMesh.static_mesh_types:
+                    if entity_type in StaticMesh.static_mesh_types:
                         static_mesh = StaticMesh(entity, entity_type)
 
                         if static_mesh.invalid:
@@ -336,6 +415,17 @@ class MapImporter(asset_importer.AssetImporter):
                             continue
 
                         static_mesh.link_object_instance(obj, import_collection)
+
+                    # lights
+                    elif entity_type in GameLight.light_types:
+                        light = GameLight(entity)
+
+                        if light.invalid:
+                            utils.verbose_print(f"Info: Skipping instance of {static_mesh.entity_name}. "
+                                                "Invalid property.")
+                            continue
+
+                        light.import_light(import_collection)
 
         # TODO: required due to unknown reason, blender bug? Otherwise, some meshes have None materials.
         bpy.app.timers.register(self._library_reload, first_interval=0.010)
