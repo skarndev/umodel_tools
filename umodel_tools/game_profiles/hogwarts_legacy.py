@@ -89,6 +89,7 @@ TEXTURE_PARAM_NAME_TRS = {
     "window_surface_sro": TextureMapTypes.SRO
 }
 
+
 @dataclasses.dataclass
 class MaterialContext:
     bsdf_node: t.Optional[bpy.types.ShaderNodeBsdfPrincipled | bpy.types.ShaderNodeBsdfDiffuse]
