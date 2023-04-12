@@ -58,3 +58,5 @@ menu, typically located at the top of the viewport.
     files into the ``.cats.txt`` file which preserves the directory tree in the asset browser. In order to see the
     assets in the asset browser, make sure to set the value of current profile's ``Asset directory`` parameter as an
     asset search path (``Edit`` -> ``Preferences`` -> ``File Paths`` -> ``Asset Libraries`` -> ``Add Asset Library``).
+    For now the assets do not have their previews generated automatically. You can use
+    `this addon <https://github.com/Gorgious56/asset_browser_utilities>`_ to batch generate them.

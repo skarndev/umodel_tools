@@ -62,7 +62,7 @@ The ``Options`` window should appear.
 2. Make sure that both ``Skeletal Mesh`` and ``Static Mesh`` under the ``Mesh Export`` section are set to `ActorX`. The
    ``umodel_tools`` Blender add-on supports only the .psk/.pskx files as mesh assets.
 3. Make sure that ``Texture format`` under ``Texture Export`` section is set to ``PNG``. Other extensions are also
-   supported by the the add-on, but `.png` is more reliable, and can be easily opened by various graphics software.
+   supported by the add-on, but `.png` is more reliable, and can be easily opened by various graphics software.
 4. Leave all other settings unchanged (as shown on the picture), and git ``OK`` to save the settings.
 
 As the configuration is over, it is recommended to export **the entire** game into the export folder. In order to do
