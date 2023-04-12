@@ -81,21 +81,13 @@ TEXTURE_PARAM_NAME_TRS = {
     "worn mro": TextureMapTypes.MRO,
     "worn mroh": TextureMapTypes.MROH,
     "worn mroh/sroh": TextureMapTypes.MROH,
-    "worn mro/sro": TextureMapTypes.MRO
+    "worn mro/sro": TextureMapTypes.MRO,
+    "window_surface_diffuse": TextureMapTypes.Diffuse,
+    "window_surface_normal": TextureMapTypes.Normal,
+    "window_surface_mro": TextureMapTypes.MRO,
+    "window_surface_mroh": TextureMapTypes.MROH,
+    "window_surface_sro": TextureMapTypes.SRO
 }
-
-#: Suffixes of textures for automatic texture purpose guessing (lowercase only)
-SUFFIX_MAP = {
-    'd': TextureMapTypes.Diffuse,
-    'n': TextureMapTypes.Normal,
-    'mro': TextureMapTypes.MRO,
-    'sro': TextureMapTypes.SRO,
-    'mroh': TextureMapTypes.MROH,
-    'mroa': TextureMapTypes.MRO,  # TODO: figure out what MROA means.
-    'sroh': TextureMapTypes.MROH,  # TODO: verify, just in case, if SROH is actually a thing.
-    'msk': TextureMapTypes.MSK
-}
-
 
 @dataclasses.dataclass
 class MaterialContext:
@@ -118,12 +110,13 @@ def do_process_texture(tex_type: str, tex_short_name: str) -> bool:  # pylint: d
     return tex_type.lower() in TEXTURE_PARAM_NAME_TRS
 
 
-def is_diffuse_tex_type(tex_type: str) -> bool:
+def is_diffuse_tex_type(tex_type: str, tex_short_name: str) -> bool:  # pylint: disable=unused-argument
     return TEXTURE_PARAM_NAME_TRS.get(tex_type.lower()) in {TextureMapTypes.Diffuse, TextureMapTypes.MSK}
 
 
 def handle_material_texture_pbr(mat: bpy.types.Material,
                                 tex_type: str,
+                                tex_short_name: str,  # pylint: disable=unused-argument
                                 img_node: bpy.types.ShaderNodeTexImage,
                                 ao_mix_node: bpy.types.ShaderNodeMix,
                                 bsdf_node: bpy.types.ShaderNodeBsdfPrincipled,
@@ -231,7 +224,8 @@ def handle_material_texture_pbr(mat: bpy.types.Material,
 
 
 def handle_material_texture_simple(mat: bpy.types.Material,
-                                   _: str,
+                                   tex_type: str,  # pylint: disable=unused-argument
+                                   tex_short_name: str,  # pylint: disable=unused-argument
                                    img_node: bpy.types.ShaderNodeTexImage,
                                    bsdf_node: bpy.types.ShaderNodeBsdfDiffuse):
     _state_buffer[mat].bsdf_node = bsdf_node

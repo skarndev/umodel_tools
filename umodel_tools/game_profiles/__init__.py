@@ -40,16 +40,18 @@ class GameHandler(t.Protocol):
         :return: True if should process, False if should discard.
         """
 
-    def is_diffuse_tex_type(tex_type: str) -> bool:
+    def is_diffuse_tex_type(tex_type: str, tex_short_name: str) -> bool:
         """Identifies if the texture is a diffuse color map.
         Used for special logic.
 
         :param tex_type: Texture type string retrieved from .props.txt.
+        :param tex_short_name: Basename of the texture file without extension.
         :return: True if texture is a diffuse map, else False.
         """
 
     def handle_material_texture_pbr(mat: bpy.types.Material,
                                     tex_type: str,
+                                    tex_short_name: str,
                                     img_node: bpy.types.ShaderNodeTexImage,
                                     ao_mix_node: bpy.types.ShaderNodeMix,
                                     bsdf_node: bpy.types.ShaderNodeBsdfPrincipled,
@@ -58,6 +60,7 @@ class GameHandler(t.Protocol):
 
         :param mat: Currently processed material.
         :param tex_type: Current texture type.
+        :param tex_short_name: Basename of the texture file without extension.
         :param img_node: Image node in the material's node tree.
         :param ao_mix_node: Ambient Occlusion mixing node in the material's node tree.
         :param bsdf_node: PrincipledBSDF node in the material's node tree.
@@ -66,6 +69,7 @@ class GameHandler(t.Protocol):
 
     def handle_material_texture_simple(mat: bpy.types.Material,
                                        tex_type: str,
+                                       tex_short_name: str,
                                        img_node: bpy.types.ShaderNodeTexImage,
                                        bsdf_node: bpy.types.ShaderNodeBsdfDiffuse) -> None:
         """Handles adding texture maps to a simplified material. Only diffuse maps will be processed by this
@@ -73,6 +77,7 @@ class GameHandler(t.Protocol):
 
         :param mat: Currently processed material.
         :param tex_type: Current texture type.
+        :param tex_short_name: Basename of the texture file without extension.
         :param img_node: Image node in the material's node tree.
         :param bsdf_node: DiffuseBSDF node in the material's node tree.
         """
