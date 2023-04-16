@@ -2,6 +2,7 @@ import json
 import math
 import os
 import typing as t
+import enum
 
 import mathutils as mu
 import bpy
@@ -74,29 +75,23 @@ def get_parent_transform_matrix(json_obj,
         # obtain the parent's relative matrix
         trs = InstanceTransform()
 
+        if (pos := props.get("RelativeLocation", None)) is not None:
+            trs.pos = [pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100]
+
+        if (scale := props.get("RelativeScale3D", None)) is not None:
+            trs.scale = [scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1)]
+
         match obj_type:
             case 'SpotLightComponent' | 'PointLightComponent':
-                if (pos := props.get("RelativeLocation", None)) is not None:
-                    trs.pos = [pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100]
-
                 if (rot := props.get("RelativeRotation", None)) is not None:
                     trs.rot_euler = (rot.get("Roll") + 90,
                                      -rot.get("Pitch") - 90,
                                      rot.get("Yaw"))
-
-                if (scale := props.get("RelativeScale3D", None)) is not None:
-                    trs.scale = [scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1)]
             case _:
-                if (pos := props.get("RelativeLocation", None)) is not None:
-                    trs.pos = (pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100)
-
                 if (rot := props.get("RelativeRotation", None)) is not None:
                     trs.rot_euler = (math.radians(rot.get("Roll")),
-                                     math.radians(rot.get("Pitch") * -1),
-                                     math.radians(rot.get("Yaw") * -1))
-
-                if (scale := props.get("RelativeScale3D", None)) is not None:
-                    trs.scale = (scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1))
+                                     math.radians(-rot.get("Pitch")),
+                                     math.radians(-rot.get("Yaw")))
 
         # obtain the parent's parent transform
         if ((parent := props.get("AttachParent", None)) is not None
@@ -178,8 +173,8 @@ class StaticMesh:
 
                 if (rot := props.get("RelativeRotation", None)) is not None:
                     trs.rot_euler = (math.radians(rot.get("Roll")),
-                                     math.radians(rot.get("Pitch") * -1),
-                                     math.radians(rot.get("Yaw") * -1))
+                                     math.radians(-rot.get("Pitch")),
+                                     math.radians(-rot.get("Yaw")))
 
                 if (scale := props.get("RelativeScale3D", None)) is not None:
                     trs.scale = (scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1))
@@ -200,8 +195,8 @@ class StaticMesh:
 
                 if (rot := props.get("RelativeRotation", None)) is not None:
                     trs.rot_euler = (math.radians(rot.get("Roll")),
-                                     math.radians(rot.get("Pitch") * -1),
-                                     math.radians(rot.get("Yaw") * -1))
+                                     math.radians(-rot.get("Pitch")),
+                                     math.radians(-rot.get("Yaw")))
 
                 if (scale := props.get("RelativeScale3D", None)) is not None:
                     trs.scale = (scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1))
@@ -272,11 +267,34 @@ class StaticMesh:
 
 
 class GameLight:
+
+    #: all entity types this reader supports
     light_types = [
         'SpotLightComponent',
-        # 'AnimatedLightComponent',
+        'RectLightComponent',
         'PointLightComponent'
     ]
+
+    #: maps UE light types to Blender's light types
+    light_type_mapping = {
+        'SpotLightComponent': 'SPOT',
+        'RectLightComponent': 'AREA',
+        'PointLightComponent': 'POINT'
+    }
+
+    class IntensityUnits(enum.Enum):
+        """All light intensity units supported by UE lights.
+        """
+        Unitless = enum.auto()
+        Candelas = enum.auto()
+        Lumens = enum.auto()
+
+    #: maps intensity unit type json values to the enum
+    light_intensity_units_mapping = {
+        'ELightUnits::Unitless': IntensityUnits.Unitless,
+        'ELightUnits::Candelas': IntensityUnits.Candelas,
+        'ELightUnits::Lumens': IntensityUnits.Lumens
+    }
 
     type: str = ""
 
@@ -286,6 +304,15 @@ class GameLight:
     scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
     parent_mtx: t.Optional[mu.Matrix] = None
+    intensity: float = math.pi
+    intensity_units: IntensityUnits = IntensityUnits.Unitless
+    cone_angle: float
+    inner_cone_angle: float = 0.0
+    cast_shadows: bool = False
+    source_radius: bool = 0.0
+    attenuation_radius: float = 0.0
+    source_width: float = 0.0
+    source_height: float = 0.0
 
     no_entity = False
 
@@ -351,6 +378,71 @@ class GameLight:
                 g[0] * temp_inv + g[1] * temp + g[2],
                 ((b[0] * temp + b[1]) * temp + b[2]) * temp + b[3])
 
+    @staticmethod
+    def quaternion_to_euler(quaternion: mu.Quaternion) -> tuple[float, float, float]:
+        w, y, x, z = quaternion
+        roll = math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
+        pitch = math.asin(max(min(2 * (w * y - z * x), 1), -1))
+        yaw = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+        return roll, pitch, yaw
+
+    @staticmethod
+    def normalize_rotation(x, y, z) -> tuple[float, float, float]:
+        """
+        Convert rotation from UE's coordinate system to Blender's coordinate system.
+        This code seems to be specific for lights.
+
+        :param x: X component.
+        :param y: Y component.
+        :param z: Z component.
+        :return: Euler angle as tuple in Blender's coordinate space.
+        """
+
+        euler = mu.Euler((
+            math.radians(x),
+            math.radians(y),
+            math.radians(z)
+        ))
+
+        quat = euler.to_quaternion()  # pylint: disable=assignment-from-no-return
+
+        # swizzle the quaternion
+        quat = mu.Quaternion([quat.w, quat.x, quat.y, -quat.z])
+
+        x, y, z = GameLight.quaternion_to_euler(quat)
+
+        x = math.degrees(-x) - 90
+        y = math.degrees(-y)
+        z = math.degrees(z) - 270
+
+        return math.radians(x), math.radians(y), math.radians(z)
+
+    @staticmethod
+    def srgb_to_linear(s: int):
+        """Converts a color channel from SRGB to linear color space.
+
+        :param s: Color channel in SRGB color space.
+        :return: Color channel in linear color space.
+        """
+        if s <= 0.0404482362771082:
+            lin = s / 12.92
+        else:
+            lin = pow(((s + 0.055) / 1.055), 2.4)
+        return lin
+
+    @staticmethod
+    def get_linear_rgb(color_prop: dict) -> tuple[float, float, float]:
+        """Converts JSON color property to Blender color in linear color space.
+
+        :param color_prop: Color property from .json.
+        :return: Blender color in linear color space.
+        """
+        return (
+            GameLight.srgb_to_linear(color_prop["R"] / 255),
+            GameLight.srgb_to_linear(color_prop["G"] / 255),
+            GameLight.srgb_to_linear(color_prop["B"] / 255)
+        )
+
     @property
     def invalid(self) -> bool:
         return self.no_entity
@@ -373,9 +465,7 @@ class GameLight:
             self.pos = [pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100]
 
         if (rot := props.get("RelativeRotation", None)) is not None:
-            self.rot = (rot.get("Roll") + 90,
-                        -rot.get("Pitch") - 90,
-                        rot.get("Yaw"))
+            self.rot = GameLight.normalize_rotation(rot.get("Roll"), rot.get("Pitch"), rot.get("Yaw"))
 
         if (scale := props.get("RelativeScale3D", None)) is not None:
             self.scale = [scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1)]
@@ -387,8 +477,38 @@ class GameLight:
         if (temp := props.get("Temperature", None)) is not None:
             self.color = self.temp_to_color(temp)
 
-        # TODO: expand this method with more properties for the specific light types
-        # Problem: I don't know how values for UE lights map to Blender's light types.
+        # TODO: for now color overrides the temperature based setting if present. Check if they're mutually exclusive.
+        if (color := props.get("LightColor", None)) is not None:
+            self.color = self.get_linear_rgb(color)
+
+        if (intensity := props.get("Intensity", None)) is not None:
+            self.intensity = intensity
+
+        if (intensity_units := props.get("IntensityUnits", None)) is not None:
+            self.intensity_units = GameLight.light_intensity_units_mapping.get(intensity_units)
+
+        self.cone_angle = 44.0 if self.type == 'SpotLightComponent' else 90.0
+
+        if (cone_angle := props.get("OuterConeAngle", None)) is not None:
+            self.cone_angle = cone_angle
+
+        if (inner_cone_angle := props.get("InnerConeAngle", None)) is not None:
+            self.inner_cone_angle = inner_cone_angle
+
+        if (source_radius := props.get("SourceRadius", None)) is not None:
+            self.source_radius = source_radius
+
+        if (cast_shadows := props.get("CastShadows", None)) is not None:
+            self.cast_shadows = cast_shadows
+
+        if (attenuation_radius := props.get("AttenuationRadius", None)) is not None:
+            self.attenuation_radius = attenuation_radius
+
+        if (source_width := props.get("SourceWidth", None)) is not None:
+            self.source_width = source_width
+
+        if (source_height := props.get("SourceHeight", None)) is not None:
+            self.source_height = source_height
 
         return None
 
@@ -397,22 +517,14 @@ class GameLight:
             print(f"Refusing to import {self.entity_name} due to failed checks.")
             return False
 
-        match self.type:
-            case 'SpotLightComponent':
-                light_data = bpy.data.lights.new(name=self.entity_name, type='SPOT')
-            case 'PointLightComponent':
-                light_data = bpy.data.lights.new(name=self.entity_name, type='POINT')
-
+        light_data = bpy.data.lights.new(name=self.entity_name, type=self.light_type_mapping.get(self.type))
         light_obj = bpy.data.objects.new(name=self.entity_name, object_data=light_data)
 
         if self.parent_mtx is None:
             light_obj.scale = (self.scale[0], self.scale[1], self.scale[2])
             light_obj.location = (self.pos[0], self.pos[1], self.pos[2])
             light_obj.rotation_mode = 'XYZ'
-            light_obj.rotation_euler = mu.Euler((math.radians(self.rot[0]),
-                                                math.radians(self.rot[1]),
-                                                math.radians(self.rot[2])),
-                                                'XYZ')
+            light_obj.rotation_euler = mu.Euler((self.rot[0], self.rot[1], self.rot[2]), 'XYZ')
         else:
             local_mtx = InstanceTransform()
             local_mtx.pos = self.pos
@@ -421,7 +533,48 @@ class GameLight:
 
             light_obj.matrix_world = self.parent_mtx @ local_mtx.matrix_4x4
 
+        light_data.use_custom_distance = True
+        light_data.cutoff_distance = 1000 * 0.01  # default value
+
+        if light_data.type == 'SPOT':
+            light_data.spot_size = math.radians(self.cone_angle)
+            light_data.spot_blend = 1.0 - (math.radians(self.inner_cone_angle) / math.radians(self.cone_angle))
+
+        match light_data.type:
+            case 'SPOT' | 'POINT':
+                match self.intensity_units:
+                    case GameLight.IntensityUnits.Unitless:
+                        light_data.energy = (99.5 * (1 - math.cos(self.cone_angle / 2))) * self.intensity
+                    case GameLight.IntensityUnits.Candelas:
+                        light_data.energy = self.intensity * 683 / (4 * math.pi)
+                    case GameLight.IntensityUnits.Lumens:
+                        light_data.energy = self.intensity / 683
+
+            case 'AREA':
+                match self.intensity_units:
+                    case GameLight.IntensityUnits.Unitless:
+                        light_data.energy = self.intensity * 199 / 683
+                    case GameLight.IntensityUnits.Candelas:
+                        light_data.energy = self.intensity * 683 / (4 * math.pi)
+                    case GameLight.IntensityUnits.Lumens:
+                        light_data.energy = self.intensity / 683
+
         light_data.color = self.color
+        light_data.shadow_soft_size = self.source_radius * 0.01
+        light_data.use_shadow = self.cast_shadows
+
+        if hasattr(light_data, "cycles"):
+            light_data.cycles.cast_shadow = self.cast_shadows
+
+        if self.attenuation_radius:
+            light_data.use_custom_distance = True
+            light_data.cutoff_distance = self.attenuation_radius * 0.01
+
+        if light_data.type == 'AREA':
+            light_data.shape = 'RECTANGLE'
+            light_data.size = self.source_width * 0.01
+            light_data.size_y = self.source_height * 0.01
+
         collection.objects.link(light_obj)
         bpy.context.scene.collection.objects.link(light_obj)
 
