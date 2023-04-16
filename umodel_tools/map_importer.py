@@ -26,6 +26,16 @@ def split_object_path(object_path):
     return object_path
 
 
+def parse_ue_object_name(obj_name: str) -> tuple[str, str, str]:
+    obj_type, obj_path, _ = obj_name.split('\'')
+    _, obj_path = obj_path.split(':')
+
+    names = obj_path.split('.')
+    assert len(names) >= 2
+
+    return obj_type, names[-2], names[-1]
+
+
 class InstanceTransform:
     pos: tuple[float, float, float]
     rot_euler: tuple[float, float, float]
@@ -46,6 +56,59 @@ class InstanceTransform:
                                      mu.Vector(self.scale))
 
 
+def get_parent_transform_matrix(json_obj,
+                                obj_type: str,
+                                obj_outer: str,
+                                obj_name: str) -> mu.Matrix:
+
+    for entity in json_obj:
+        if (((entity_type := entity.get("Type", None)) is None or entity_type != obj_type)
+           or ((entity_outer := entity.get("Outer", None)) is None or entity_outer != obj_outer)
+           or ((entity_name := entity.get("Name", None)) is None or entity_name != obj_name)):
+            continue
+
+        props = entity.get("Properties", None)
+        if props is None:
+            return InstanceTransform().matrix_4x4
+
+        # obtain the parent's relative matrix
+        trs = InstanceTransform()
+
+        match obj_type:
+            case 'SpotLightComponent' | 'PointLightComponent':
+                if (pos := props.get("RelativeLocation", None)) is not None:
+                    trs.pos = [pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100]
+
+                if (rot := props.get("RelativeRotation", None)) is not None:
+                    trs.rot_euler = (rot.get("Roll") + 90,
+                                     -rot.get("Pitch") - 90,
+                                     rot.get("Yaw"))
+
+                if (scale := props.get("RelativeScale3D", None)) is not None:
+                    trs.scale = [scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1)]
+            case _:
+                if (pos := props.get("RelativeLocation", None)) is not None:
+                    trs.pos = (pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100)
+
+                if (rot := props.get("RelativeRotation", None)) is not None:
+                    trs.rot_euler = (math.radians(rot.get("Roll")),
+                                     math.radians(rot.get("Pitch") * -1),
+                                     math.radians(rot.get("Yaw") * -1))
+
+                if (scale := props.get("RelativeScale3D", None)) is not None:
+                    trs.scale = (scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1))
+
+        # obtain the parent's parent transform
+        if ((parent := props.get("AttachParent", None)) is not None
+           and (obj_name := parent.get("ObjectName", None)) is not None):
+            return get_parent_transform_matrix(json_obj, *parse_ue_object_name(obj_name)) @ trs.matrix_4x4
+
+        # return the absolute transform if no parent
+        return trs.matrix_4x4
+
+    return InstanceTransform().matrix_4x4
+
+
 class StaticMesh:
     static_mesh_types = [
         'StaticMeshComponent',
@@ -57,6 +120,7 @@ class StaticMesh:
     asset_path: str = ""
     transform: InstanceTransform
     instance_transforms: list[InstanceTransform]
+    parent_mtx: t.Optional[mu.Matrix] = None
 
     # these are just properties to help with debugging
     no_entity: bool = False
@@ -67,9 +131,8 @@ class StaticMesh:
     is_instanced: bool = False
     not_rendered: bool = False
     invisible: bool = False
-    bad_creation_method: bool = False
 
-    def __init__(self, json_entity: t.Any, entity_type: str) -> None:
+    def __init__(self, json_obj: t.Any, json_entity: t.Any, entity_type: str) -> None:
         self.entity_name = json_entity.get("Outer", 'Error')
         self.instance_transforms = []
 
@@ -97,9 +160,9 @@ class StaticMesh:
         if (is_visbile := props.get("bVisible", None)) is not None and not is_visbile:
             self.invisible = True
 
-        if ((creation_method := props.get("CreationMethod", None)) is not None
-           and creation_method == "EComponentCreationMethod::UserConstructionScript"):
-            self.bad_creation_method = True
+        if ((parent := props.get("AttachParent", None)) is not None
+           and (obj_name := parent.get("ObjectName", None)) is not None):
+            self.parent_mtx = get_parent_transform_matrix(json_obj, *parse_ue_object_name(obj_name))
 
         objpath = split_object_path(object_path)
 
@@ -165,7 +228,7 @@ class StaticMesh:
     @property
     def invalid(self) -> bool:
         return (self.no_path or self.no_entity or self.base_shape or self.no_mesh or self.no_per_instance_data
-                or self.not_rendered or self.invisible or self.bad_creation_method)
+                or self.not_rendered or self.invisible)
 
     def link_object_instance(self,
                              obj: bpy.types.Object,
@@ -182,16 +245,26 @@ class StaticMesh:
                 mat_world = trs.matrix_4x4 @ instance_trs.matrix_4x4
                 new_obj = bpy.data.objects.new(obj.name, object_data=obj.data)
                 new_obj.rotation_mode = 'XYZ'
-                new_obj.matrix_world = mat_world
+
+                if self.parent_mtx is None:
+                    new_obj.matrix_world = mat_world
+                else:
+                    new_obj.matrix_world = self.parent_mtx @ mat_world
+
                 collection.objects.link(new_obj)
                 objects.append(new_obj)
 
         else:
             new_obj = bpy.data.objects.new(obj.name, object_data=obj.data)
-            new_obj.scale = (trs.scale[0], trs.scale[1], trs.scale[2])
-            new_obj.location = (trs.pos[0], trs.pos[1], trs.pos[2])
-            new_obj.rotation_mode = 'XYZ'
-            new_obj.rotation_euler = mu.Euler((trs.rot_euler[0], trs.rot_euler[1], trs.rot_euler[2]), 'XYZ')
+
+            if self.parent_mtx is None:
+                new_obj.scale = (trs.scale[0], trs.scale[1], trs.scale[2])
+                new_obj.location = (trs.pos[0], trs.pos[1], trs.pos[2])
+                new_obj.rotation_mode = 'XYZ'
+                new_obj.rotation_euler = mu.Euler((trs.rot_euler[0], trs.rot_euler[1], trs.rot_euler[2]), 'XYZ')
+            else:
+                new_obj.matrix_world = self.parent_mtx @ trs.matrix_4x4
+
             collection.objects.link(new_obj)
             objects.append(new_obj)
 
@@ -212,6 +285,7 @@ class GameLight:
     rot: tuple[float, float, float] = (0.0, 0.0, 0.0)
     scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    parent_mtx: t.Optional[mu.Matrix] = None
 
     no_entity = False
 
@@ -281,7 +355,7 @@ class GameLight:
     def invalid(self) -> bool:
         return self.no_entity
 
-    def __init__(self, json_entity) -> None:
+    def __init__(self, json_obj, json_entity) -> None:
         self.entity_name = json_entity.get("Outer", 'Error')
         self.type = json_entity.get("Type", None)
 
@@ -295,18 +369,20 @@ class GameLight:
             self.no_entity = True
             return None
 
-        if props.get("RelativeLocation", False):
-            pos = props.get("RelativeLocation")
+        if (pos := props.get("RelativeLocation", None)) is not None:
             self.pos = [pos.get("X") / 100, pos.get("Y") / -100, pos.get("Z") / 100]
 
         if (rot := props.get("RelativeRotation", None)) is not None:
-            self.rot = (rot.get("Roll"),
-                        rot.get("Pitch"),
-                        rot.get("Yaw") * -1)
+            self.rot = (rot.get("Roll") + 90,
+                        -rot.get("Pitch") - 90,
+                        rot.get("Yaw"))
 
-        if props.get("RelativeScale3D", False):
-            scale = props.get("RelativeScale3D")
+        if (scale := props.get("RelativeScale3D", None)) is not None:
             self.scale = [scale.get("X", 1), scale.get("Y", 1), scale.get("Z", 1)]
+
+        if ((parent := props.get("AttachParent", None)) is not None
+           and (obj_name := parent.get("ObjectName", None)) is not None):
+            self.parent_mtx = get_parent_transform_matrix(json_obj, *parse_ue_object_name(obj_name))
 
         if (temp := props.get("Temperature", None)) is not None:
             self.color = self.temp_to_color(temp)
@@ -328,13 +404,23 @@ class GameLight:
                 light_data = bpy.data.lights.new(name=self.entity_name, type='POINT')
 
         light_obj = bpy.data.objects.new(name=self.entity_name, object_data=light_data)
-        light_obj.scale = (self.scale[0], self.scale[1], self.scale[2])
-        light_obj.location = (self.pos[0], self.pos[1], self.pos[2])
-        light_obj.rotation_mode = 'XYZ'
-        light_obj.rotation_euler = mu.Euler((math.radians(self.rot[0]),
-                                             math.radians(self.rot[1]),
-                                             math.radians(self.rot[2])),
-                                            'XYZ')
+
+        if self.parent_mtx is None:
+            light_obj.scale = (self.scale[0], self.scale[1], self.scale[2])
+            light_obj.location = (self.pos[0], self.pos[1], self.pos[2])
+            light_obj.rotation_mode = 'XYZ'
+            light_obj.rotation_euler = mu.Euler((math.radians(self.rot[0]),
+                                                math.radians(self.rot[1]),
+                                                math.radians(self.rot[2])),
+                                                'XYZ')
+        else:
+            local_mtx = InstanceTransform()
+            local_mtx.pos = self.pos
+            local_mtx.rot_euler = self.rot
+            local_mtx.scale = self.scale
+
+            light_obj.matrix_world = self.parent_mtx @ local_mtx.matrix_4x4
+
         light_data.color = self.color
         collection.objects.link(light_obj)
         bpy.context.scene.collection.objects.link(light_obj)
@@ -394,7 +480,7 @@ class MapImporter(asset_importer.AssetImporter):
 
                     # static meshes
                     if entity_type in StaticMesh.static_mesh_types:
-                        static_mesh = StaticMesh(entity, entity_type)
+                        static_mesh = StaticMesh(json_object, entity, entity_type)
 
                         if static_mesh.invalid:
                             utils.verbose_print(f"Info: Skipping instance of {static_mesh.entity_name}. "
@@ -418,7 +504,7 @@ class MapImporter(asset_importer.AssetImporter):
 
                     # lights
                     elif entity_type in GameLight.light_types:
-                        light = GameLight(entity)
+                        light = GameLight(json_object, entity)
 
                         if light.invalid:
                             utils.verbose_print(f"Info: Skipping instance of {static_mesh.entity_name}. "
