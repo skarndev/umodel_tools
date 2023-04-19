@@ -4,7 +4,7 @@
 
 [![](https://dcbadge.vercel.app/api/server/DJYZwyegSF)](https://discord.gg/DJYZwyegSF)
 
-A [Blender](https://blender.org>) add-on featuring import of [Unreal Engine](https://www.unrealengine.com>)
+A [Blender](https://blender.org) add-on featuring import of [Unreal Engine](https://www.unrealengine.com)
 games static meshes (stored in-game as .uasset) and maps (stored in-game as .umap). It provides basic support for many
 UE games, while [some](https://skarndev.github.io/umodel_tools/supported_games.html) have dedicated improved support.
 
