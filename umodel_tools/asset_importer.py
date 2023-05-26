@@ -38,8 +38,8 @@ class AssetImporter:
         description="Format of textures expected to be in the UModel export directory.",
         items=[
             ('.png', '.png', '', 0),
-            ('.dds', '.dds', '', 0),
-            ('.tga', '.tga', '', 0)
+            ('.dds', '.dds', '', 1),
+            ('.tga', '.tga', '', 2)
         ],
         default='.png'
     )
